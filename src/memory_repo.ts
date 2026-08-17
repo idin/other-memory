@@ -6,6 +6,7 @@ import {
   NAMESPACE,
   assertWellFormed,
   describeLayout,
+  isHiddenFromAgents,
   isWithinNamespace,
 } from "./layout";
 
@@ -29,6 +30,9 @@ export function assertReadable(path: string): void {
         + `It only reads inside ${NAMESPACE}.`,
     );
   }
+  if (isHiddenFromAgents(path)) {
+    throw new Error(`${path} is not visible to any agent-facing tool.`);
+  }
 }
 
 /**
@@ -47,6 +51,9 @@ export function assertAppendable(path: string): void {
       `${path} is one of the rules this server follows and is read-only to it. `
         + "Edit it yourself if the rules should change.",
     );
+  }
+  if (isHiddenFromAgents(path)) {
+    throw new Error(`${path} is not visible to any agent-facing tool.`);
   }
   if (!isWithinNamespace(path)) {
     throw new Error(

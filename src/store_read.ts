@@ -15,7 +15,7 @@
 
 import { Octokit } from "octokit";
 
-import { NAMESPACE } from "./layout";
+import { NAMESPACE, isHiddenFromAgents } from "./layout";
 import { decodeBase64 } from "./base64";
 import type { MemoryRepoConfig } from "./memory_repo";
 import type { StoreFile } from "./store_checks";
@@ -129,7 +129,9 @@ export async function listStoreTree(
   return (tree.data.tree ?? [])
     .filter(
       (node) =>
-        node.type === "blob" && (node.path ?? "").startsWith(NAMESPACE),
+        node.type === "blob"
+        && (node.path ?? "").startsWith(NAMESPACE)
+        && !isHiddenFromAgents(node.path ?? ""),
     )
     .map((node) => ({
       path: node.path ?? "",

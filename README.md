@@ -23,7 +23,11 @@ thousands of events a day, use something else.
 
 ## What it does
 
-Twelve tools, in four groups.
+This table is out of date — it does not list every tool the server
+registers (search, comparison and improvement-review tools are missing,
+and `move_memory_file` no longer matches the code's `rename_memory_subject`).
+Left as a known gap rather than expanded here; see `src/index.ts` for the
+current, complete list.
 
 **Reading**
 | Tool | |
@@ -48,10 +52,9 @@ Twelve tools, in four groups.
 **Messages between agents**
 | Tool | |
 | --- | --- |
-| `send_message` | Leave a note for another conversation. |
-| `check_inbox` | What is waiting, oldest first. |
-| `read_message` | One message in full. |
-| `archive_message` | File it away once acted on. |
+| `leave_note_for_agent` | Leave a note for another conversation. Requires a token for the sender's name. |
+| `read_and_archive_agent_notes` | Read every note waiting, in full, and archive them — one call. Requires a token for the name. |
+| `verify_agent_name_token` | Check a name and token against what is on record, without revealing it either way. |
 
 The message tools let one chat leave something for another. Tell one
 conversation it is "Ada" and another "Scout", and Ada can leave Scout a note
@@ -59,6 +62,13 @@ that Scout finds later. Names are matched loosely — case, spaces, dashes,
 underscores and accents are ignored, so `Ada`, `A-D-A` and `ada` are one
 mailbox, and a typo gets "did you mean ada?" rather than a silently empty
 inbox.
+
+Every name requires a token. MCP gives a server no way to tell two
+different, unrelated sessions apart — nothing proves which one is really
+"Ada" — so a token is what stops an unrelated session from colliding with
+a name already in use. Tokens are set up by the person running the server
+directly, as a commit to a file no agent-facing tool can read or write;
+no tool creates or returns one.
 
 ## Where it writes
 

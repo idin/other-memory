@@ -6,6 +6,7 @@ import {
   INSTRUCTIONS_PREFIX,
   NAMESPACE,
   assertWellFormed,
+  isHiddenFromAgents,
   isWithinNamespace,
 } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
@@ -33,6 +34,11 @@ export function assertManagedPath(path: string): void {
     throw new Error(
       `${path} holds the rules this server follows and must not be moved or `
         + "deleted by it.",
+    );
+  }
+  if (isHiddenFromAgents(path)) {
+    throw new Error(
+      `${path} is not visible to any agent-facing tool.`,
     );
   }
   if (!ALLOWED_EXTENSIONS.some((extension) => path.endsWith(extension))) {
@@ -68,7 +74,9 @@ export async function listMemoryFiles(
   return tree.data.tree
     .filter(
       (entry) =>
-        entry.type === "blob" && (entry.path ?? "").startsWith(NAMESPACE),
+        entry.type === "blob"
+        && (entry.path ?? "").startsWith(NAMESPACE)
+        && !isHiddenFromAgents(entry.path ?? ""),
     )
     .map((entry) => ({
       path: entry.path as string,

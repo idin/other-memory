@@ -36,6 +36,7 @@ import {
   readMessage,
   sendMessage,
 } from "./messages";
+import { verifyAgentNameToken } from "./agent_name_tokens";
 import {
   describeTopics,
   pathForTopic,
@@ -1121,24 +1122,52 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
 
   private registerMessageTools() {
     this.registerTool(
-      "send_message",
+      "leave_note_for_agent",
       {
         description:
           "Leave a message for another chat or agent. Use when the user says " +
           "something one conversation should pass to another — not for facts " +
           "about the user, which belong in memory via append_memory. Names are " +
           "free-form and matched loosely, so 'Ada', 'ada' and 'A-D-A' are the " +
-          "same mailbox. The timestamp is generated server-side.",
+          "same mailbox. The timestamp is generated server-side. Every name " +
+          "requires a token, checked against agent_name_tokens.md — call " +
+          "verify_agent_name_token if unsure whether the sender's token is " +
+          "current.",
         inputSchema: {
           from: z
             .string()
             .describe("Name this conversation is going by, e.g. Ada"),
+          from_token: z
+            .string()
+            .describe("This conversation's token for the 'from' name."),
           to: z.string().describe("Name of the recipient, e.g. Scout"),
           subject: z.string().describe("One line describing the message."),
           body: z.string().describe("The message itself, as markdown."),
         },
       },
-      async ({ from, to, subject, body }) => {
+      async ({ from, from_token, to, subject, body }) => {
+        const verdict = await verifyAgentNameToken(
+          this.repoConfig(),
+          from,
+          from_token,
+        );
+        if (verdict.outcome !== "verified") {
+          return {
+            content: [
+              {
+                type: "text",
+                text:
+                  verdict.outcome === "no_token_on_record"
+                    ? `"${from}" has no token on record. Every name now `
+                      + "requires one — ask the user to set one up."
+                    : `The token provided for "${from}" does not match `
+                      + "what is on record.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
         const result = await sendMessage(this.repoConfig(), {
           from,
           to,
@@ -1160,21 +1189,49 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
     );
 
     this.registerTool(
-      "check_inbox",
+      "read_and_archive_agent_notes",
       {
         description:
-          "List messages waiting for a named agent, oldest first. Call this at the " +
-          "start of a conversation when the user has given this chat a name. " +
-          "Name matching ignores case, spaces, dashes and underscores; if " +
-          "nothing matches, close names are suggested rather than returning an " +
-          "empty inbox for a typo.",
+          "Read every note waiting for a named agent, in full, and archive " +
+          "them — one call, not a list-then-read-then-archive sequence. Call " +
+          "this at the start of a conversation when the user has given this " +
+          "chat a name. Name matching ignores case, spaces, dashes and " +
+          "underscores; if nothing matches, close names are suggested rather " +
+          "than returning an empty inbox for a typo. Archiving keeps the " +
+          "content, so this is safe and needs no confirmation. Every name " +
+          "requires a token, checked against agent_name_tokens.md.",
         inputSchema: {
           recipient: z
             .string()
-            .describe("Name to check messages for, e.g. Ada"),
+            .describe("Name to read notes for, e.g. Ada"),
+          recipient_token: z
+            .string()
+            .describe("This conversation's token for the recipient name."),
         },
       },
-      async ({ recipient }) => {
+      async ({ recipient, recipient_token }) => {
+        const verdict = await verifyAgentNameToken(
+          this.repoConfig(),
+          recipient,
+          recipient_token,
+        );
+        if (verdict.outcome !== "verified") {
+          return {
+            content: [
+              {
+                type: "text",
+                text:
+                  verdict.outcome === "no_token_on_record"
+                    ? `"${recipient}" has no token on record. Every name now `
+                      + "requires one — ask the user to set one up."
+                    : `The token provided for "${recipient}" does not match `
+                      + "what is on record.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
         const result = await listInbox(this.repoConfig(), recipient);
 
         if (!result.resolved) {
@@ -1203,18 +1260,31 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
           };
         }
 
-        const lines = result.messages.map(
-          (message) =>
-            `${message.sentAt} — from ${message.sender}: ${message.subject}\n` +
-            `  path: ${message.path}`,
-        );
+        const read: { summary: (typeof result.messages)[number]; content: string }[] =
+          [];
+        for (const summary of result.messages) {
+          const message = await readMessage(this.repoConfig(), summary.path);
+          read.push({ summary, content: message.content });
+        }
+
+        for (const { summary } of read) {
+          await archiveMessage(this.repoConfig(), summary.path);
+        }
+
+        const described = read
+          .map(
+            ({ summary, content }) =>
+              `--- ${summary.sentAt} — from ${summary.sender}: ${summary.subject} ---\n` +
+              content,
+          )
+          .join("\n\n");
         return {
           content: [
             {
               type: "text",
               text:
-                `${result.messages.length} message(s) for ${result.resolved}:\n` +
-                lines.join("\n"),
+                `${read.length} note(s) for ${result.resolved}, now archived:\n\n` +
+                described,
             },
           ],
         };
@@ -1222,44 +1292,34 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
     );
 
     this.registerTool(
-      "read_message",
+      "verify_agent_name_token",
       {
         description:
-          "Read one message in full, by the path returned from check_inbox. " +
-          "Reading does not remove it — archive it once acted on.",
+          "Check whether a name and token match what is on record in " +
+          "agent_name_tokens.md, without revealing the recorded token " +
+          "either way. Every name now requires a token to be used with " +
+          "leave_note_for_agent or read_and_archive_agent_notes — call " +
+          "this first if unsure whether the token this conversation has " +
+          "is still current. Tokens are set up by the user directly; no " +
+          "tool creates or returns one.",
         inputSchema: {
-          path: z
-            .string()
-            .describe("Path from check_inbox, under messages/inbox/."),
+          name: z.string().describe("The name being checked, e.g. Ada"),
+          token: z.string().describe("The token this conversation has for that name."),
         },
       },
-      async ({ path }) => {
-        const message = await readMessage(this.repoConfig(), path);
-        return { content: [{ type: "text", text: message.content }] };
-      },
-    );
-
-    this.registerTool(
-      "archive_message",
-      {
-        description:
-          "File a message away once it has been read and acted on, moving it from " +
-          "messages/inbox/ to messages/archive/. The content is kept, so this " +
-          "is safe and needs no confirmation. Archive rather than delete.",
-        inputSchema: {
-          path: z.string().describe("Path under messages/inbox/ to archive."),
-        },
-      },
-      async ({ path }) => {
-        const result = await archiveMessage(this.repoConfig(), path);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Archived to ${result.to} (commit ${result.commitSha.slice(0, 7)}).`,
-            },
-          ],
-        };
+      async ({ name, token }) => {
+        const verdict = await verifyAgentNameToken(
+          this.repoConfig(),
+          name,
+          token,
+        );
+        const text =
+          verdict.outcome === "verified"
+            ? `"${name}" and the provided token match what is on record.`
+            : verdict.outcome === "no_token_on_record"
+              ? `"${name}" has no token on record.`
+              : `The token provided for "${name}" does not match what is on record.`;
+        return { content: [{ type: "text", text }] };
       },
     );
   }

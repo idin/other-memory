@@ -93,6 +93,15 @@ describe("assertManagedPath protects every instruction, not one file", () => {
   });
 });
 
+describe("assertManagedPath protects hidden_from_agents from every agent-facing tool", () => {
+  test.each([
+    "other-memory/hidden_from_agents/agent_name_tokens.md",
+    "other-memory/hidden_from_agents/anything_else.md",
+  ])("%s", (path) => {
+    expect(() => assertManagedPath(path)).toThrow(/not visible to any agent-facing tool/);
+  });
+});
+
 describe("assertManagedPath error messages", () => {
   test("names the namespace when the path is outside it", () => {
     expect(() => assertManagedPath("README.md")).toThrow(/other-memory\//);

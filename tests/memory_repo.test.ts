@@ -69,6 +69,19 @@ describe("assertAppendable protects every instruction, not one file", () => {
   });
 });
 
+describe("hidden_from_agents is neither readable nor writable", () => {
+  // The mirror image of instructions: those are readable but not writable,
+  // this is neither. Agent-name tokens must never reach any agent-facing
+  // tool in either direction.
+  test.each([
+    "other-memory/hidden_from_agents/agent_name_tokens.md",
+    "other-memory/hidden_from_agents/anything_else.md",
+  ])("%s", (path) => {
+    expect(() => assertReadable(path)).toThrow(/not visible to any agent-facing tool/);
+    expect(() => assertAppendable(path)).toThrow(/not visible to any agent-facing tool/);
+  });
+});
+
 describe("assertAppendable rejects everything outside", () => {
   test.each([
     ["repo root", "README.md"],

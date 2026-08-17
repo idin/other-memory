@@ -53,11 +53,13 @@ git init --quiet --initial-branch=main
 git config user.email "sandbox@example.invalid"
 git config user.name "other-memory sandbox"
 
-# Commit one: the instructions and the rules. Dated well before the rest, so a
-# revert target exists that predates every fact in the repository.
+# Commit one: the instructions, the rules, and the agent-name tokens. Dated
+# well before the rest, so a revert target exists that predates every fact
+# in the repository.
 mkdir -p other-memory
 cp -R "$fixture_directory/other-memory/instructions" other-memory/
 cp -R "$fixture_directory/other-memory/capture_rules" other-memory/
+cp -R "$fixture_directory/other-memory/hidden_from_agents" other-memory/
 git add -A
 GIT_AUTHOR_DATE="2026-01-05T10:00:00Z" GIT_COMMITTER_DATE="2026-01-05T10:00:00Z" \
 	git commit --quiet -m "chore: standing instructions and capture rules"

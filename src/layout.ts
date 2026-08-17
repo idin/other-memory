@@ -75,6 +75,14 @@ export const CAPTURE_RULES_PREFIX = `${NAMESPACE}capture_rules/`;
  */
 export const INSTRUCTIONS_PREFIX = `${NAMESPACE}instructions/`;
 
+/**
+ * Where agent-name-verification data lives. Never readable and never
+ * writable by any agent-facing tool, whatever it is called and however
+ * deeply it nests — the mirror image of `INSTRUCTIONS_PREFIX`, which is
+ * readable but never writable. This prefix is neither.
+ */
+export const HIDDEN_FROM_AGENTS_PREFIX = `${NAMESPACE}hidden_from_agents/`;
+
 /** Decision log filenames are per-year: `decisions/2026.md`. */
 export const DECISION_LOG_PATTERN = new RegExp(
   `^${DECISIONS_PREFIX.replace(/\//g, "\\/")}\\d{4}\\.md$`,
@@ -105,6 +113,16 @@ export function assertWellFormed(path: string): void {
 /** True when a path sits inside the namespace this server owns. */
 export function isWithinNamespace(path: string): boolean {
   return path.startsWith(NAMESPACE);
+}
+
+/**
+ * True when a path falls under the prefix no agent-facing tool may ever
+ * read or write. Checked wherever a path is validated for either
+ * direction, unlike `INSTRUCTIONS_PREFIX`, which only needs checking on
+ * the write side because reading it is intended.
+ */
+export function isHiddenFromAgents(path: string): boolean {
+  return path.startsWith(HIDDEN_FROM_AGENTS_PREFIX);
 }
 
 /** Human-readable summary of the layout, used in tool descriptions. */

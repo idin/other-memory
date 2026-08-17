@@ -58,7 +58,7 @@ describe("reportingFailures", () => {
     const { sink } = recordingSink();
 
     const result = (await reportingFailures({
-      tool: "check_inbox",
+      tool: "read_and_archive_agent_notes",
       args: {},
       login: "idin",
       sink,
@@ -69,7 +69,7 @@ describe("reportingFailures", () => {
 
     // An agent that cannot tell a failure from an empty result will report
     // the empty result to the user as though it were the answer.
-    expect(result.content[0].text).toContain("check_inbox");
+    expect(result.content[0].text).toContain("read_and_archive_agent_notes");
     expect(result.content[0].text).toContain("no mailbox");
     expect(result.isError).toBe(true);
   });
