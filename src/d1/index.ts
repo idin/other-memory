@@ -17,3 +17,4 @@ export {
   d1MemoryIndex,
   MAX_CARRY_FORWARD_EXCLUSIONS,
 } from "./memory_index";
+export { D1MemoryMCP, type D1Env } from "./memory_mcp";
