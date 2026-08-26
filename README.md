@@ -245,6 +245,46 @@ Export the subclass under the name your `wrangler.jsonc` binds — Durable Objec
 bindings are by class name, and renaming one needs a migration that discards
 existing state.
 
+### Optional: D1-backed storage
+
+If your deployment has a [D1](https://developers.cloudflare.com/d1/) database
+bound, `other-memory/d1` has ready-made sinks so failures, usage, the search
+index and search judgments all land in tables instead of being discarded or
+written to the console. Importing from `other-memory/d1` is the only way any
+of this loads — the base server has no D1 dependency, and a deployment with
+no database pays nothing for it.
+
+```ts
+import { MemoryMCP as Base } from "other-memory";
+import { d1FailureSink, d1UsageSink, d1MemoryIndex, d1RelevanceSink, d1RawSearchSink } from "other-memory/d1";
+
+export class MemoryMCP extends Base {
+  async init() {
+    if (this.env.MY_DATABASE) {
+      this.failureSink = d1FailureSink(this.env.MY_DATABASE);
+      this.usageSink = d1UsageSink(this.env.MY_DATABASE);
+      this.memoryIndex = d1MemoryIndex(this.env.MY_DATABASE, { now: () => Date.now() });
+      this.relevanceSink = d1RelevanceSink(this.env.MY_DATABASE);
+      this.rawSearchSink = d1RawSearchSink(this.env.MY_DATABASE, {
+        now: () => Date.now(),
+        roundId: () => crypto.randomUUID(),
+      });
+    }
+    await super.init();
+
+    // Also opt-in: the three tools that read the sinks above back out
+    // (list_tool_failures, report_embedding_budget_used,
+    // report_search_judgment_counts). Registered only if you call this.
+    if (this.env.MY_DATABASE) {
+      await this.registerD1Tools(this.env.MY_DATABASE);
+    }
+  }
+}
+```
+
+Every table is created lazily on first write, so a fresh database needs no
+migration step. See `src/d1/` for the schemas.
+
 ### A note on updating
 
 claude.ai caches the tool list when you connect. After deploying a change that

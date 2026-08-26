@@ -1,6 +1,6 @@
 {
   "name": "other-memory",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "MCP server giving Claude a long-term memory in a GitHub repo you own",
   "license": "MIT",
   "author": "Idin K",
@@ -21,6 +21,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./worker": "./src/worker.ts",
+    "./d1": "./src/d1/index.ts",
     "./package.json": "./package.json"
   },
   "files": [

@@ -48,7 +48,7 @@ import {
   reportingFailures,
   type FailureSink,
 } from "./tool_errors";
-import { noOpUsageSink, type UsageSink } from "./api_usage";
+import { describeUsage, noOpUsageSink, type UsageSink } from "./api_usage";
 import {
   noOpMemoryIndex,
   type MemoryIndex,
@@ -1320,6 +1320,145 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
               ? `"${name}" has no token on record.`
               : `The token provided for "${name}" does not match what is on record.`;
         return { content: [{ type: "text", text }] };
+      },
+    );
+  }
+
+  /**
+   * Register the D1-backed observability tools: `list_tool_failures`,
+   * `report_embedding_budget_used`, `report_search_judgment_counts`.
+   *
+   * Opt-in. A deployment calls this from its own `init()`, after wiring
+   * `failureSink`/`usageSink`/`relevanceSink` to the same database, if it
+   * wants these tools; the base server never calls it itself, and nothing
+   * about D1 is loaded unless this method runs. Most deployments have no
+   * database and should not pay for tools that read one.
+   *
+   * The D1 sink implementations live in `other-memory/d1` rather than here,
+   * and are imported dynamically so a consumer who never calls this method
+   * never pulls in D1 types at all.
+   *
+   * @param database - The bound D1 database these tools read from.
+   * @returns Nothing.
+   */
+  protected async registerD1Tools(database: D1Database): Promise<void> {
+    const { recentFailures } = await import("./d1/failure_sink");
+    const { usageSince, startOfUtcDay } = await import("./d1/usage_sink");
+    const { judgmentCounts } = await import("./d1/relevance_sink");
+
+    this.registerTool(
+      "list_tool_failures",
+      {
+        description:
+          "List recent failures of this server's own tools, newest first. Use " +
+          "this when a tool has been misbehaving and you want to see what " +
+          "actually went wrong, rather than guessing from a failed call. " +
+          "Returns the tool, the time, the message and the stack. Memory " +
+          "content is redacted from the recorded arguments.",
+        inputSchema: {
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(100)
+            .optional()
+            .describe("How many to return. Defaults to 20."),
+        },
+      },
+      async ({ limit }) => {
+        const failures = await recentFailures(database, { limit: limit ?? 20 });
+        if (failures.length === 0) {
+          return { content: [{ type: "text", text: "No failures recorded." }] };
+        }
+
+        const described = failures
+          .map((failure) =>
+            [
+              `${failure.timestamp}  ${failure.tool}`,
+              `  ${failure.message}`,
+              `  arguments: ${failure.arguments}`,
+              failure.stack ? `  ${failure.stack.split("\n")[1]?.trim() ?? ""}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          )
+          .join("\n\n");
+        return { content: [{ type: "text", text: described }] };
+      },
+    );
+
+    this.registerTool(
+      "report_embedding_budget_used",
+      {
+        description:
+          "Report what this server has spent on external APIs today, against " +
+          "the free daily allowance. Use it before a large rebuild, or when " +
+          "something looks like it is costing more than expected. Figures " +
+          "for embeddings are estimated from character counts, because that " +
+          "API reports no token usage; reconcile against the Cloudflare " +
+          "dashboard for billing.",
+        inputSchema: {
+          since: z
+            .string()
+            .optional()
+            .describe(
+              "ISO 8601 cutoff. Defaults to 00:00 UTC today, which is when " +
+                "the free allowance resets.",
+            ),
+        },
+      },
+      async ({ since }) => {
+        const cutoff = since ?? startOfUtcDay(Date.now());
+        const records = await usageSince(database, { since: cutoff });
+        return {
+          content: [
+            { type: "text", text: `Since ${cutoff}: ${describeUsage(records)}` },
+          ],
+        };
+      },
+    );
+
+    this.registerTool(
+      "report_search_judgment_counts",
+      {
+        description:
+          "Report how many search results have been judged relevant or " +
+          "irrelevant so far. Use it to see whether enough has been " +
+          "collected to be worth analysing, and whether both kinds are " +
+          "represented — a set of only good matches cannot teach anything " +
+          "to tell them apart.",
+        inputSchema: {},
+      },
+      async () => {
+        const counts = await judgmentCounts(database);
+        if (counts.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text:
+                  "Nothing judged yet. Call assess_search_results after a " +
+                  "search to start recording which results were useful.",
+              },
+            ],
+          };
+        }
+
+        const described = counts
+          .map((row) => `${row.count} ${row.label}`)
+          .join(", ");
+        const relevant =
+          counts.find((row) => row.label === "relevant")?.count ?? 0;
+        const irrelevant =
+          counts.find((row) => row.label === "irrelevant")?.count ?? 0;
+        const note =
+          relevant === 0 || irrelevant === 0
+            ? " Both kinds are needed before this can measure anything: " +
+              "without rejections there is no way to tell a good score from " +
+              "a bad one at the same value."
+            : "";
+
+        return { content: [{ type: "text", text: `${described}.${note}` }] };
       },
     );
   }
