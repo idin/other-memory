@@ -1,5 +1,5 @@
 /**
- * Digesting misjudgements into things that prevent a recurrence.
+ * Digesting mistakes into things that prevent a recurrence.
  *
  * Idin's ruling, 2026-08-12: he decides to run a digest. An agent may suggest
  * running one and may propose what it would produce, but does not run it and
@@ -18,9 +18,9 @@
 
 import { Octokit } from "octokit";
 
-import { MISJUDGEMENTS_PREFIX } from "./layout";
+import { MISTAKES_PREFIX } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
-import { DIGESTED_MARKER } from "./misjudgements";
+import { DIGESTED_MARKER } from "./mistakes";
 
 export type DigestMaterial = {
   entries: Array<{ path: string; text: string }>;
@@ -100,7 +100,7 @@ export async function gatherDigestMaterial(
     .map((node) => node.path ?? "")
     .filter(
       (path) =>
-        path.startsWith(MISJUDGEMENTS_PREFIX) && !path.endsWith("/README.md"),
+        path.startsWith(MISTAKES_PREFIX) && !path.endsWith("/README.md"),
     )
     .sort();
 

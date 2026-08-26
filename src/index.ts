@@ -20,9 +20,9 @@ import { applyDepth, describeDeep, summariseDeep } from "./deep_memory";
 import { gatherDigestMaterial } from "./digest";
 import { applyRevert, planRevert, revertOperation } from "./memory_revert";
 import {
-  describeMisjudgementState,
-  summariseMisjudgements,
-} from "./misjudgements";
+  describeMistakeState,
+  summariseMistakes,
+} from "./mistakes";
 import {
   createMemoryFile,
   deleteMemoryFile,
@@ -625,14 +625,14 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
           content,
           commit_message,
         );
-        // Recording a misjudgement is the one moment the state of the log is
+        // Recording a mistake is the one moment the state of the log is
         // certainly relevant, and the only moment it is certainly reached.
         // Reporting the count on a read tool instead would mean an agent that
         // only ever writes never learns the log is filling up.
         const note =
-          topic === "misjudgement"
-            ? describeMisjudgementState(
-                await summariseMisjudgements(this.repoConfig()),
+          topic === "mistake"
+            ? describeMistakeState(
+                await summariseMistakes(this.repoConfig()),
               )
             : null;
 
@@ -964,7 +964,7 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
     );
 
     this.registerTool(
-      "gather_tool_failures_and_ai_misjudgements",
+      "gather_tool_failures_and_ai_mistakes",
       {
         description:
           "Gather evidence for improvements the user might want to make, in "
@@ -977,7 +977,7 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
           + "links to.\n"
           + "tools: which tools keep failing, and whether they fail the same "
           + "way each time.\n"
-          + "rules: every undigested entry in the misjudgement log, in full, "
+          + "rules: every undigested entry in the mistake log, in full, "
           + "plus findings about which rules are not working — a pattern "
           + "recurring after a rule was written to prevent it means that "
           + "rule failed.\n\n"
@@ -1040,10 +1040,10 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
     );
 
     this.registerTool(
-      "gather_all_undigested_ai_misjudgements",
+      "gather_all_undigested_ai_mistakes",
       {
         description:
-          "Collect the undigested misjudgements so a digest can be PROPOSED. "
+          "Collect the undigested mistakes so a digest can be PROPOSED. "
           + "Call this only when the user asks for a digest — it is theirs to "
           + "run, not yours to start. You may suggest running one. "
           + "Returns the entries and the rules a digest must follow. Nothing "

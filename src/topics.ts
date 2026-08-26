@@ -3,7 +3,7 @@ import {
   DECISIONS_PREFIX,
   FACTS_PREFIX,
   IDEAS_PREFIX,
-  MISJUDGEMENTS_PREFIX,
+  MISTAKES_PREFIX,
   PROPOSALS_PREFIX,
   TODOS_PREFIX,
 } from "./layout";
@@ -57,8 +57,8 @@ export const TOPICS = {
     description:
       "a thought worth keeping that is not yet a proposal and may never be",
   },
-  misjudgement: {
-    prefix: MISJUDGEMENTS_PREFIX,
+  mistake: {
+    prefix: MISTAKES_PREFIX,
     extension: ".md",
     dated: true,
     description:

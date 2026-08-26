@@ -124,14 +124,14 @@ export function surveyToolFailures(
 }
 
 /**
- * Turn the misjudgement log into findings about the rules.
+ * Turn the mistake log into findings about the rules.
  *
  * The signal worth finding is recurrence: a pattern appearing after a rule was
  * written to prevent it means that rule failed. That is more valuable than any
  * number of fresh observations, and it is easy to miss because the entry
  * describing a recurrence reads like every other entry.
  *
- * @param entries - Misjudgement entries, with their text.
+ * @param entries - Mistake entries, with their text.
  * @returns Findings about rules that may not be working.
  */
 export function surveyRules(
@@ -164,7 +164,7 @@ export function surveyRules(
     if (share >= 60) {
       findings.push({
         kind: "log_measures_what_idin_found",
-        path: "misjudgements/",
+        path: "mistakes/",
         detail:
           `${share}% of entries say Idin caught it. A self-reported log `
           + "under-reports, and a log that mostly records what one person "
@@ -176,7 +176,7 @@ export function surveyRules(
   if (digested.length === 0 && entries.length >= 5) {
     findings.push({
       kind: "nothing_digested_yet",
-      path: "misjudgements/",
+      path: "mistakes/",
       detail:
         `${entries.length} entries and none marked digested. Until a digest `
         + "runs, this is a record of failure rather than a loop that changes "

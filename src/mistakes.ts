@@ -1,5 +1,5 @@
 /**
- * Reading the misjudgement log, and knowing when it is worth digesting.
+ * Reading the mistake log, and knowing when it is worth digesting.
  *
  * The log records where an agent got something wrong. On its own that is a
  * confessional: entries accumulate, nobody rereads them, and the same mistake
@@ -13,7 +13,7 @@
 
 import { Octokit } from "octokit";
 
-import { MISJUDGEMENTS_PREFIX } from "./layout";
+import { MISTAKES_PREFIX } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
 
 /**
@@ -31,7 +31,7 @@ export const DIGEST_RECOMMENDED_AT = 10;
 /** Marker a digested entry carries, so counting needs no separate index. */
 export const DIGESTED_MARKER = "Digested ";
 
-export type MisjudgementSummary = {
+export type MistakeSummary = {
   total: number;
   undigested: number;
   /** Present only when a digest is worth running, so callers can pass it on. */
@@ -48,9 +48,9 @@ export type MisjudgementSummary = {
  * @param config - Where the memory lives.
  * @returns Totals, and a recommendation when one is warranted.
  */
-export async function summariseMisjudgements(
+export async function summariseMistakes(
   config: MemoryRepoConfig,
-): Promise<MisjudgementSummary> {
+): Promise<MistakeSummary> {
   const octokit = new Octokit({ auth: config.token });
 
   let entries: string[];
@@ -71,7 +71,7 @@ export async function summariseMisjudgements(
       .map((node) => node.path ?? "")
       .filter(
         (path) =>
-          path.startsWith(MISJUDGEMENTS_PREFIX) && !path.endsWith("/README.md"),
+          path.startsWith(MISTAKES_PREFIX) && !path.endsWith("/README.md"),
       );
   } catch {
     // No folder yet is the same state as no entries, and reporting an error
@@ -92,7 +92,7 @@ export async function summariseMisjudgements(
     undigested,
     recommendation:
       undigested >= DIGEST_RECOMMENDED_AT
-        ? `${undigested} undigested misjudgements. That is enough repetition `
+        ? `${undigested} undigested mistakes. That is enough repetition `
           + "for patterns to be visible rather than guessed at — worth running "
           + "a digest, if Idin wants one."
         : null,
@@ -106,11 +106,11 @@ export async function summariseMisjudgements(
  * paragraph on every call is noise that gets skimmed past — including on the
  * call where it mattered.
  *
- * @param summary - What `summariseMisjudgements` found.
+ * @param summary - What `summariseMistakes` found.
  * @returns A single line, or null when there is nothing worth saying.
  */
-export function describeMisjudgementState(
-  summary: MisjudgementSummary,
+export function describeMistakeState(
+  summary: MistakeSummary,
 ): string | null {
   if (summary.undigested === 0) {
     return null;
@@ -118,7 +118,7 @@ export function describeMisjudgementState(
   if (summary.recommendation) {
     return summary.recommendation;
   }
-  return `${summary.undigested} undigested misjudgement${
+  return `${summary.undigested} undigested mistake${
     summary.undigested === 1 ? "" : "s"
   }.`;
 }

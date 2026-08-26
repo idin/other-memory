@@ -132,19 +132,19 @@ describe("surveyToolFailures", () => {
   });
 });
 
-describe("surveyRules reads the misjudgement log", () => {
+describe("surveyRules reads the mistake log", () => {
   test("an entry that reads as a repeat is the signal worth finding", () => {
     // A pattern recurring after a rule was written to prevent it means the
     // rule failed. More valuable than any number of fresh observations.
     const material = surveyRules([
-      { path: "misjudgements/a.md", text: "Under-counted its own errors, again." },
+      { path: "mistakes/a.md", text: "Under-counted its own errors, again." },
     ]);
     expect(material.findings.some((f) => f.kind === "pattern_recurred")).toBe(true);
   });
 
   test("a log nobody has digested is worth saying so", () => {
     const entries = Array.from({ length: 6 }, (_, index) => ({
-      path: `misjudgements/${index}.md`,
+      path: `mistakes/${index}.md`,
       text: "Something went wrong.",
     }));
     const material = surveyRules(entries);
@@ -155,7 +155,7 @@ describe("surveyRules reads the misjudgement log", () => {
 
   test("a digested log is not nagged about", () => {
     const entries = Array.from({ length: 6 }, (_, index) => ({
-      path: `misjudgements/${index}.md`,
+      path: `mistakes/${index}.md`,
       text: "Something went wrong.\nDigested 2026-08-13: no rule emitted.",
     }));
     const material = surveyRules(entries);
@@ -166,7 +166,7 @@ describe("surveyRules reads the misjudgement log", () => {
 
   test("a log that mostly records what one person found says so", () => {
     const entries = Array.from({ length: 5 }, (_, index) => ({
-      path: `misjudgements/${index}.md`,
+      path: `mistakes/${index}.md`,
       text: "Caught by: Idin",
     }));
     const material = surveyRules(entries);

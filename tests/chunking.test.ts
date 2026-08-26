@@ -243,7 +243,7 @@ The layout moved on 2026-08-09, so the paths in your note are stale.
 });
 
 describe("short files stay whole", () => {
-  const MISJUDGEMENT = `# Argued a cap needed protecting from the wrong thing
+  const MISTAKE = `# Argued a cap needed protecting from the wrong thing
 
 Argued that the subfolder escape had to be closed or the cap would be
 meaningless. That treated the cap as a limit on file size. It is a limit on
@@ -259,7 +259,7 @@ Recorded 2026-08-12.
     // Splitting the pattern from the error it generalises leaves two chunks
     // that each mean less than the whole.
     const chunks = chunkFile(
-      file("other-memory/misjudgements/2026-08-12_argued_a_cap.md", MISJUDGEMENT),
+      file("other-memory/mistakes/2026-08-12_argued_a_cap.md", MISTAKE),
     );
     expect(chunks).toHaveLength(1);
     expect(chunks[0].text).toContain("Pattern:");
@@ -268,7 +268,7 @@ Recorded 2026-08-12.
 
   test("it still carries its title", () => {
     const chunks = chunkFile(
-      file("other-memory/misjudgements/2026-08-12_argued_a_cap.md", MISJUDGEMENT),
+      file("other-memory/mistakes/2026-08-12_argued_a_cap.md", MISTAKE),
     );
     expect(chunks[0].headingPath).toEqual([
       "Argued a cap needed protecting from the wrong thing",

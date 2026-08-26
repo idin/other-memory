@@ -96,7 +96,7 @@ describe("first and second person", () => {
   });
 
   test("quoted speech is exempt", () => {
-    // A misjudgement entry records what Idin actually said. Rewriting the
+    // A mistake entry records what Idin actually said. Rewriting the
     // quotation to name him would falsify the record to satisfy a style rule.
     expect(
       people('Caught by Idin: "I didn\'t say rule-name, I said skill".'),

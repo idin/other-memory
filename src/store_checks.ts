@@ -134,7 +134,7 @@ export function checkStore(files: StoreFile[]): StoreFinding[] {
  * Whether a file is discussing the rules rather than subject to them.
  *
  * A todo that specifies an abbreviation check has to name the abbreviations.
- * A misjudgement entry recording a naming error has to quote the error. A
+ * A mistake entry recording a naming error has to quote the error. A
  * decision log records what was decided, in the words it was decided in.
  *
  * Run against the real store, half the abbreviation findings were files of
@@ -318,7 +318,7 @@ function unnamedPeople(files: StoreFile[]): StoreFinding[] {
     if (discussesTheRules(file) || file.path.startsWith(MESSAGES_PREFIX)) {
       continue;
     }
-    // Quoted speech is exempt, and must be. A misjudgement entry records what
+    // Quoted speech is exempt, and must be. A mistake entry records what
     // Idin actually said; rewriting the quotation to name him would falsify
     // the record to satisfy a style rule. Against the real store this was
     // five of six findings — a check firing on them would train its reader to

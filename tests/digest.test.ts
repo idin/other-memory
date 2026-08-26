@@ -2,50 +2,50 @@ import { describe, expect, test } from "vitest";
 
 import { digestedNote } from "../src/digest";
 import {
-  describeMisjudgementState,
+  describeMistakeState,
   DIGEST_RECOMMENDED_AT,
   DIGESTED_MARKER,
-} from "../src/misjudgements";
+} from "../src/mistakes";
 
 /**
- * The digest exists so the misjudgement log is a control loop rather than a
+ * The digest exists so the mistake log is a control loop rather than a
  * confessional. Most of what matters is that entries cannot quietly resurface
  * forever, and that a count nobody acts on does not become a number nobody
  * reads.
  */
 
-describe("describeMisjudgementState", () => {
+describe("describeMistakeState", () => {
   test("says nothing when there is nothing undigested", () => {
     // A line on every tool response saying "0 undigested" is noise, and noise
     // is what gets skimmed past on the call where it mattered.
     expect(
-      describeMisjudgementState({ total: 9, undigested: 0, recommendation: null }),
+      describeMistakeState({ total: 9, undigested: 0, recommendation: null }),
     ).toBeNull();
   });
 
   test("reports a small count without recommending anything", () => {
-    const note = describeMisjudgementState({
+    const note = describeMistakeState({
       total: 3,
       undigested: 3,
       recommendation: null,
     });
-    expect(note).toBe("3 undigested misjudgements.");
+    expect(note).toBe("3 undigested mistakes.");
   });
 
   test("a single entry reads as singular", () => {
-    const note = describeMisjudgementState({
+    const note = describeMistakeState({
       total: 1,
       undigested: 1,
       recommendation: null,
     });
-    expect(note).toBe("1 undigested misjudgement.");
+    expect(note).toBe("1 undigested mistake.");
   });
 
   test("passes the recommendation through once the threshold is reached", () => {
-    const note = describeMisjudgementState({
+    const note = describeMistakeState({
       total: 14,
       undigested: 14,
-      recommendation: "14 undigested misjudgements. Worth a digest.",
+      recommendation: "14 undigested mistakes. Worth a digest.",
     });
     expect(note).toContain("Worth a digest");
   });

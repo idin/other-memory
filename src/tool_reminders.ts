@@ -4,7 +4,7 @@
  * A rule written in prose and read at session start is at the weakest tier
  * available: it competes for attention with everything else loaded that
  * session, and by the time it applies it may be thousands of tokens behind.
- * Several entries in this repository's misjudgement log are failures of rules
+ * Several entries in this repository's mistake log are failures of rules
  * that were already written down.
  *
  * A rule attached to a tool response arrives at the only moment it matters, in

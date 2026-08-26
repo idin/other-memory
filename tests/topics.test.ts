@@ -94,10 +94,10 @@ describe("pathForTopic puts things where they belong", () => {
     );
   });
 
-  test("a misjudgement is dated and filed on its own", () => {
+  test("a mistake is dated and filed on its own", () => {
     // The mirror of decisions/: what was wrong, beside what was chosen.
-    expect(pathForTopic("misjudgement", "asserted a path without checking", WHEN)).toBe(
-      "other-memory/misjudgements/2026-08-09_asserted_a_path_without_checking.md",
+    expect(pathForTopic("mistake", "asserted a path without checking", WHEN)).toBe(
+      "other-memory/mistakes/2026-08-09_asserted_a_path_without_checking.md",
     );
   });
 

@@ -60,14 +60,14 @@ const CHUNK_TARGET_TOKENS = 320;
  * The line count below which a file with no internal sections is one chunk.
  *
  * Two conditions, not one. Length alone is the wrong test: a thirty-line file
- * with four `##` sections is four things, and a ninety-line misjudgement with
+ * with four `##` sections is four things, and a ninety-line mistake with
  * no headings at all is one. So this applies only to files that have no
  * heading below the title — where there is nothing to split on that the author
  * put there.
  *
  * The number derives from the store's own layout rule, which says a file
  * becomes a folder past roughly 100 lines. A file below that with no sections
- * is one argument: a misjudgement's "Pattern:" paragraph is meaningless split
+ * is one argument: a mistake's "Pattern:" paragraph is meaningless split
  * from the error it generalises, and an instruction's rationale is meaningless
  * split from the rule.
  */

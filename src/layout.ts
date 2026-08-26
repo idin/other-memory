@@ -46,13 +46,13 @@ export const TODOS_PREFIX = `${FUTURE_PREFIX}todos/`;
 export const PAST_PREFIX = `${NAMESPACE}past/`;
 
 /**
- * Where an agent's misjudgements are recorded, one file per entry.
+ * Where an agent's mistakes are recorded, one file per entry.
  *
  * The mirror of `decisions/`. That logs what was chosen and why; this logs
  * what was wrong and why, so the pattern can be seen across entries rather
  * than re-derived each time.
  */
-export const MISJUDGEMENTS_PREFIX = `${NAMESPACE}misjudgements/`;
+export const MISTAKES_PREFIX = `${NAMESPACE}mistakes/`;
 
 /**
  * Mutable rules the assistant has learned about what to capture, one file per
@@ -130,7 +130,7 @@ export function describeLayout(): string {
   return (
     `${FACTS_PREFIX}<topic>.md for facts, `
     + `${DECISIONS_PREFIX}<year>.md for decisions, `
-    + `${MISJUDGEMENTS_PREFIX}<entry>.md for things an agent got wrong, `
+    + `${MISTAKES_PREFIX}<entry>.md for things an agent got wrong, `
     + `${FUTURE_PREFIX}{todos,proposals,ideas}/ for work and thinking not yet `
     + `resolved, ${PAST_PREFIX} for what resolved, `
     + `${CAPTURE_RULES_PREFIX}<rule>.md for capture rules`
