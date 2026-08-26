@@ -1,6 +1,6 @@
 {
   "name": "other-memory",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "MCP server giving Claude a long-term memory in a GitHub repo you own",
   "license": "MIT",
   "author": "Idin K",
@@ -28,6 +28,7 @@
   "files": [
     "src",
     "wrangler.example.jsonc",
+    "wrangler.d1.example.jsonc",
     "README.md",
     "LICENSE"
   ],

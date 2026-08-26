@@ -12,3 +12,13 @@ import { buildWorker } from "../worker";
 import { D1MemoryMCP } from "./memory_mcp";
 
 export default buildWorker(D1MemoryMCP);
+
+/**
+ * The Durable Object class, exported under both names.
+ *
+ * `wrangler.jsonc` binds a Durable Object by class name, and changing that
+ * name needs a migration which discards the state of every existing object.
+ * An existing deployment already bound to `MemoryMCP` can therefore point
+ * `main` here without a rename; a new one can bind either.
+ */
+export { D1MemoryMCP, D1MemoryMCP as MemoryMCP };

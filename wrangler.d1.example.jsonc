@@ -1,0 +1,91 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // Copy this to wrangler.jsonc and fill in the marked values.
+  // wrangler.jsonc is gitignored, so your account details stay yours.
+  //
+  // This is the D1 variant: search keeps its index between sessions, failures
+  // and usage are kept as rows, and the tools that read them back are
+  // registered. See wrangler.example.jsonc for the version with neither a
+  // database nor embedding, which needs no bindings beyond the OAuth KV.
+
+  "name": "other-memory-mcp",
+
+  // Straight into the package. Nothing needs to be written locally — the
+  // worker, the D1 wiring and the embedder all live in other-memory.
+  "main": "node_modules/other-memory/src/d1/worker.ts",
+
+  "compatibility_date": "2025-03-10",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The class name is D1MemoryMCP here, not MemoryMCP: Durable Object
+  // bindings are by class name, and other-memory/d1/worker exports the
+  // D1-wired subclass.
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["D1MemoryMCP"]
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MCP_OBJECT",
+        "class_name": "D1MemoryMCP"
+      }
+    ]
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      // From `npx wrangler kv namespace create OAUTH_KV`.
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+    }
+  ],
+
+  // Anything that is rows rather than prose: the search index, tool
+  // failures, API usage, and search telemetry. Deliberately not in the
+  // memory repo — that repo is text a human reads and reviews in a diff,
+  // and none of these are.
+  //
+  // From `npx wrangler d1 create other-memory`. Every table is created on
+  // first write, so there is no migration step.
+  "d1_databases": [
+    {
+      "binding": "OTHER_MEMORY_DATABASE",
+      "database_name": "other-memory",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ],
+
+  // Embedding, for the half of search that matches meaning rather than
+  // spelling. Without it a search for "canine" over a store that says "toy
+  // poodle" returns nothing, and an empty result reads as "not recorded"
+  // rather than "asked using different words".
+  //
+  // Free at a small store's size: a full rebuild of ~380 chunks costs
+  // roughly 900 neurons against a 10,000-per-day allowance, and is paid
+  // once per commit rather than per session.
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Not secret. Secrets are set with `wrangler secret put` — see the README.
+  "vars": {
+    // The GitHub repo where your memory is stored. It should be private.
+    // The server only ever touches other-memory/ inside it, so an existing
+    // repo with other things in it is fine.
+    "MEMORY_REPO_OWNER": "REPLACE_WITH_YOUR_GITHUB_USERNAME",
+    "MEMORY_REPO_NAME": "REPLACE_WITH_YOUR_REPO_NAME",
+    "MEMORY_REPO_BRANCH": "main",
+
+    // Only this GitHub account may use the server. An authenticated
+    // stranger is still a stranger.
+    "ALLOWED_GITHUB_LOGIN": "REPLACE_WITH_YOUR_GITHUB_USERNAME"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

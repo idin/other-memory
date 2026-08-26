@@ -254,6 +254,27 @@ written to the console. Importing from `other-memory/d1` is the only way any
 of this loads — the base server has no D1 dependency, and a deployment with
 no database pays nothing for it.
 
+**You probably do not need to write any of this yourself.**
+`other-memory/d1/worker` is a worker with all of it already wired: point
+`wrangler.jsonc` at it, bind a database and an `AI` namespace, and there is
+no source file to write at all.
+
+```jsonc
+// wrangler.jsonc — see wrangler.d1.example.jsonc for the whole thing
+"main": "node_modules/other-memory/src/d1/worker.ts",
+"d1_databases": [{ "binding": "OTHER_MEMORY_DATABASE", /* … */ }],
+"ai": { "binding": "AI" }
+```
+
+Both bindings are optional at runtime: without the database, failures go to
+the console and telemetry is discarded; without `AI`, search matches words
+rather than meaning and says so. The class is exported as both
+`D1MemoryMCP` and `MemoryMCP`, so an existing deployment already bound to
+`MemoryMCP` can switch to this worker without a Durable Object migration.
+
+The rest of this section is for a deployment that wants to wire the pieces
+up differently.
+
 ```ts
 import { MemoryMCP as Base } from "other-memory";
 import { d1FailureSink, d1UsageSink, d1MemoryIndex, d1RelevanceSink, d1RawSearchSink } from "other-memory/d1";
