@@ -78,7 +78,7 @@ describe("checkStore finds what a rule already forbids", () => {
     // it would report the rule as a violation of itself.
     const findings = checkStore([
       file(
-        "other-memory/instructions/abbreviations_are_avoided.md",
+        "other-memory/guidance/instructions/abbreviations_are_avoided.md",
         "Rejected outright: ASAP, FYI, TBD. TD, RBC and BMO need Bank after them.",
       ),
     ]);
@@ -91,7 +91,7 @@ describe("checkStore finds what a rule already forbids", () => {
     // that are obviously wrong train whoever reads them to skip the rest.
     const findings = checkStore([
       file(
-        "other-memory/future/todos/2026-08-12_check_abbreviations.md",
+        "other-memory/work/todos/open/2026-08-12_check_abbreviations.md",
         "Whitelist violations to detect: bare TD, RBC, BMO.",
       ),
     ]);

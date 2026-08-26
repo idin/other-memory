@@ -117,15 +117,15 @@ describe("a realistic mixed commit", () => {
     const changes = planChanges([
       file("other-memory/facts/new.md", "added"),
       file("other-memory/facts/core.md", "modified"),
-      file("other-memory/past/done.md", "renamed", "other-memory/future/todos/x.md"),
+      file("other-memory/work/todos/resolved/done.md", "renamed", "other-memory/work/todos/open/x.md"),
       file("other-memory/facts/stale.md", "removed"),
       file("scripts/build.sh", "modified"),
     ]);
     expect(changes).toEqual([
       { kind: "upsert", path: "other-memory/facts/new.md" },
       { kind: "upsert", path: "other-memory/facts/core.md" },
-      { kind: "delete", path: "other-memory/future/todos/x.md" },
-      { kind: "upsert", path: "other-memory/past/done.md" },
+      { kind: "delete", path: "other-memory/work/todos/open/x.md" },
+      { kind: "upsert", path: "other-memory/work/todos/resolved/done.md" },
       { kind: "delete", path: "other-memory/facts/stale.md" },
     ]);
   });

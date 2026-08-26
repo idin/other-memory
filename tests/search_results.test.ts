@@ -206,7 +206,7 @@ describe("what was not searched is reported", () => {
       ...CONTEXT,
       searched: [
         chunk({ path: "other-memory/facts/core.md" }),
-        chunk({ path: "other-memory/past/2026-08-12_done.md" }),
+        chunk({ path: "other-memory/work/todos/resolved/2026-08-12_done.md" }),
         chunk({ path: "other-memory/messages/archive/kip/note.md" }),
       ],
     });
@@ -224,7 +224,7 @@ describe("what was not searched is reported", () => {
       includeDeep: true,
       searched: [
         chunk({ path: "other-memory/facts/core.md" }),
-        chunk({ path: "other-memory/past/2026-08-12_done.md" }),
+        chunk({ path: "other-memory/work/todos/resolved/2026-08-12_done.md" }),
       ],
     });
     expect(text).not.toMatch(/further file/);

@@ -259,7 +259,7 @@ Recorded 2026-08-12.
     // Splitting the pattern from the error it generalises leaves two chunks
     // that each mean less than the whole.
     const chunks = chunkFile(
-      file("other-memory/mistakes/2026-08-12_argued_a_cap.md", MISTAKE),
+      file("other-memory/guidance/mistakes/2026-08-12_argued_a_cap.md", MISTAKE),
     );
     expect(chunks).toHaveLength(1);
     expect(chunks[0].text).toContain("Pattern:");
@@ -268,7 +268,7 @@ Recorded 2026-08-12.
 
   test("it still carries its title", () => {
     const chunks = chunkFile(
-      file("other-memory/mistakes/2026-08-12_argued_a_cap.md", MISTAKE),
+      file("other-memory/guidance/mistakes/2026-08-12_argued_a_cap.md", MISTAKE),
     );
     expect(chunks[0].headingPath).toEqual([
       "Argued a cap needed protecting from the wrong thing",
@@ -339,7 +339,7 @@ describe("chunk identity", () => {
 
   test("resolved work is marked deep", () => {
     const chunks = chunkFile(
-      file("other-memory/past/2026-08-12_done.md", "# Done\n\nIt was finished.\n"),
+      file("other-memory/work/todos/resolved/2026-08-12_done.md", "# Done\n\nIt was finished.\n"),
     );
     expect(chunks[0].isDeep).toBe(true);
   });

@@ -14,7 +14,7 @@ describe("isHiddenFromAgents", () => {
 
   test("false for paths elsewhere in the namespace", () => {
     expect(isHiddenFromAgents("other-memory/facts/core.md")).toBe(false);
-    expect(isHiddenFromAgents("other-memory/instructions/README.md")).toBe(false);
+    expect(isHiddenFromAgents("other-memory/guidance/instructions/README.md")).toBe(false);
   });
 
   test("false for paths outside the namespace entirely", () => {

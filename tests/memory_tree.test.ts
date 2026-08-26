@@ -18,8 +18,8 @@ describe("assertManagedPath accepts paths inside the namespace", () => {
     "other-memory/facts/inventory.yaml",
     "other-memory/facts/preferences/food.yaml",
     "other-memory/facts/home/kitchen.md",
-    "other-memory/decisions/2026.md",
-    "other-memory/capture_rules/what_to_capture.md",
+    "other-memory/guidance/decisions/2026.md",
+    "other-memory/guidance/capture_rules/what_to_capture.md",
     "other-memory/a/b/c/deep.md",
   ])("%s", (path) => {
     expect(() => assertManagedPath(path)).not.toThrow();
@@ -85,9 +85,9 @@ describe("assertManagedPath protects every instruction, not one file", () => {
   // equality check on one filename would leave the rest creatable, movable and
   // deletable.
   test.each([
-    "other-memory/instructions/superseded_not_deleted.md",
-    "other-memory/instructions/security_posture.md",
-    "other-memory/instructions/README.md",
+    "other-memory/guidance/instructions/superseded_not_deleted.md",
+    "other-memory/guidance/instructions/security_posture.md",
+    "other-memory/guidance/instructions/README.md",
   ])("%s", (path) => {
     expect(() => assertManagedPath(path)).toThrow(/must not be moved or deleted/);
   });

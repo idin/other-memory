@@ -11,13 +11,12 @@
  * nothing here changes anything.
  */
 
+import { isDeep } from "./deep_memory";
 import {
   ALLOWED_EXTENSIONS,
-  ARCHIVE_PREFIX,
   INSTRUCTIONS_PREFIX,
   MESSAGES_PREFIX,
   NAMESPACE,
-  PAST_PREFIX,
 } from "./layout";
 
 /** Lines past which the layout rule says a file becomes a subfolder. */
@@ -161,7 +160,10 @@ function discussesTheRules(file: StoreFile): boolean {
  * finding nobody should act on trains its reader to skip the rest.
  */
 function isHistoricalRecord(file: StoreFile): boolean {
-  return file.path.startsWith(PAST_PREFIX) || file.path.startsWith(ARCHIVE_PREFIX);
+  // The same set the deep tier uses: every stage's resolved/ plus the message
+  // archive. Shared rather than restated, so a new resolved area cannot be
+  // added to one list and forgotten in the other.
+  return isDeep(file.path);
 }
 
 /**

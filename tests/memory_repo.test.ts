@@ -18,9 +18,9 @@ describe("assertReadable accepts paths inside the namespace", () => {
   test.each([
     "other-memory/facts/core.md",
     "other-memory/facts/preferences/food.yaml",
-    "other-memory/decisions/2026.md",
-    "other-memory/capture_rules/what_to_capture.md",
-    "other-memory/instructions/superseded_not_deleted.md",
+    "other-memory/guidance/decisions/2026.md",
+    "other-memory/guidance/capture_rules/what_to_capture.md",
+    "other-memory/guidance/instructions/superseded_not_deleted.md",
     "other-memory/messages/inbox/ada/note.md",
   ])("%s", (path) => {
     expect(() => assertReadable(path)).not.toThrow();
@@ -46,8 +46,8 @@ describe("assertAppendable accepts the same namespace", () => {
   test.each([
     "other-memory/facts/core.md",
     "other-memory/facts/preferences/food.yaml",
-    "other-memory/decisions/2026.md",
-    "other-memory/capture_rules/what_to_capture.md",
+    "other-memory/guidance/decisions/2026.md",
+    "other-memory/guidance/capture_rules/what_to_capture.md",
   ])("%s", (path) => {
     expect(() => assertAppendable(path)).not.toThrow();
   });
@@ -58,11 +58,11 @@ describe("assertAppendable protects every instruction, not one file", () => {
   // them into a folder without widening the guard would have left every rule
   // writable — the protection removed by the act of tidying.
   test.each([
-    "other-memory/instructions/superseded_not_deleted.md",
-    "other-memory/instructions/never_save_inferences.md",
-    "other-memory/instructions/security_posture.md",
-    "other-memory/instructions/README.md",
-    "other-memory/instructions/nested/deeper/invented.md",
+    "other-memory/guidance/instructions/superseded_not_deleted.md",
+    "other-memory/guidance/instructions/never_save_inferences.md",
+    "other-memory/guidance/instructions/security_posture.md",
+    "other-memory/guidance/instructions/README.md",
+    "other-memory/guidance/instructions/nested/deeper/invented.md",
   ])("readable but not writable: %s", (path) => {
     expect(() => assertReadable(path)).not.toThrow();
     expect(() => assertAppendable(path)).toThrow(/read-only/);

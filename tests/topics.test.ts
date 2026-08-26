@@ -78,32 +78,34 @@ describe("pathForTopic puts things where they belong", () => {
 
   test("a todo is dated and filed under future", () => {
     expect(pathForTopic("todo", "check the lease", WHEN)).toBe(
-      "other-memory/future/todos/2026-08-09_check_the_lease.md",
+      "other-memory/work/todos/open/2026-08-09_check_the_lease.md",
     );
   });
 
   test("a proposal is dated and filed under future", () => {
     expect(pathForTopic("proposal", "move the dns to cloudflare", WHEN)).toBe(
-      "other-memory/future/proposals/2026-08-09_move_the_dns_to_cloudflare.md",
+      "other-memory/work/proposals/open/2026-08-09_move_the_dns_to_cloudflare.md",
     );
   });
 
   test("an idea is dated and filed under future", () => {
     expect(pathForTopic("idea", "a tool that compares things", WHEN)).toBe(
-      "other-memory/future/ideas/2026-08-09_a_tool_that_compares_things.md",
+      "other-memory/work/ideas/open/2026-08-09_a_tool_that_compares_things.md",
     );
   });
 
   test("a mistake is dated and filed on its own", () => {
     // The mirror of decisions/: what was wrong, beside what was chosen.
     expect(pathForTopic("mistake", "asserted a path without checking", WHEN)).toBe(
-      "other-memory/mistakes/2026-08-09_asserted_a_path_without_checking.md",
+      "other-memory/guidance/mistakes/2026-08-09_asserted_a_path_without_checking.md",
     );
   });
 
   test("a decision goes in the decisions folder", () => {
+    // Dated since 2026-08-26: one file per decision rather than one per
+    // year, so the filename has to distinguish two decisions on one subject.
     expect(pathForTopic("decision", "use postgres", WHEN)).toBe(
-      "other-memory/decisions/use_postgres.md",
+      "other-memory/guidance/decisions/2026-08-09_use_postgres.md",
     );
   });
 });

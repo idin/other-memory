@@ -120,7 +120,7 @@ describe("first and second person", () => {
 
 describe("records of what happened are exempt", () => {
   test.each([
-    ["other-memory/past/2026-08-12_something_finished.md"],
+    ["other-memory/work/todos/resolved/2026-08-12_something_finished.md"],
     ["other-memory/messages/archive/kip/2026-08-09T00-00_ada_note.md"],
   ])("%s is not reported", (path) => {
     // Editing a resolved todo or an acted-on message to satisfy a style rule
@@ -135,7 +135,7 @@ describe("records of what happened are exempt", () => {
     expect(
       subjects(
         "It was the clearest example.",
-        "other-memory/future/todos/2026-08-14_do_something.md",
+        "other-memory/work/todos/open/2026-08-14_do_something.md",
       ),
     ).toHaveLength(1);
   });

@@ -1,8 +1,10 @@
 import { assertFilenameFits } from "./filename_limit";
 import {
+  CAPTURE_RULES_PREFIX,
   DECISIONS_PREFIX,
   FACTS_PREFIX,
   IDEAS_PREFIX,
+  INFRASTRUCTURE_PREFIX,
   MISTAKES_PREFIX,
   PROPOSALS_PREFIX,
   TODOS_PREFIX,
@@ -40,7 +42,9 @@ export const TOPICS = {
     prefix: TODOS_PREFIX,
     extension: ".md",
     dated: true,
-    description: "a task to be done, filed under future/todos",
+    description:
+      "a task to be done, filed under work/todos/open — it moves to "
+      + "work/todos/resolved when finished",
   },
   proposal: {
     prefix: PROPOSALS_PREFIX,
@@ -48,7 +52,8 @@ export const TOPICS = {
     dated: true,
     description:
       "something suggested but not decided — the user rules on it, and it "
-      + "moves to past/ either way",
+      + "moves to work/proposals/resolved either way, or on to "
+      + "work/todos/open if it becomes a task",
   },
   idea: {
     prefix: IDEAS_PREFIX,
@@ -68,9 +73,26 @@ export const TOPICS = {
   decision: {
     prefix: DECISIONS_PREFIX,
     extension: ".md",
+    dated: true,
+    description:
+      "a decision and its reasoning, as its own dated file — what was "
+      + "chosen, what was rejected, and why",
+  },
+  capture_rule: {
+    prefix: CAPTURE_RULES_PREFIX,
+    extension: ".md",
     dated: false,
     description:
-      "a decision and its reasoning — appended to the current year's log",
+      "a rule about how an agent should behave, stated explicitly by the "
+      + "user — never inferred from how a conversation went",
+  },
+  infrastructure: {
+    prefix: INFRASTRUCTURE_PREFIX,
+    extension: ".md",
+    dated: false,
+    description:
+      "machines and services rather than people: how a deployment, domain, "
+      + "server or account is set up",
   },
 } as const;
 

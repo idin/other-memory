@@ -18,16 +18,28 @@
  * that nobody decided was sensitive.
  */
 
-import { ARCHIVE_PREFIX, NAMESPACE, PAST_PREFIX } from "./layout";
+import {
+  ARCHIVE_PREFIX,
+  IDEAS_RESOLVED_PREFIX,
+  NAMESPACE,
+  PROPOSALS_RESOLVED_PREFIX,
+  TODOS_RESOLVED_PREFIX,
+} from "./layout";
 
 /**
  * Areas kept out of the default listing.
  *
- * Both are things that have already happened. `past/` is work that resolved;
- * the message archive is correspondence acted on. Neither is what a question
- * about the user is usually answered from.
+ * All are things that have already happened. The `resolved/` folder of each
+ * work stage holds what finished or was rejected; the message archive is
+ * correspondence acted on. Neither is what a question about the user is
+ * usually answered from.
  */
-export const DEEP_PREFIXES = [PAST_PREFIX, ARCHIVE_PREFIX] as const;
+export const DEEP_PREFIXES = [
+  IDEAS_RESOLVED_PREFIX,
+  PROPOSALS_RESOLVED_PREFIX,
+  TODOS_RESOLVED_PREFIX,
+  ARCHIVE_PREFIX,
+] as const;
 
 /**
  * Whether a path is deep.

@@ -78,18 +78,35 @@ it is ever touched:
 ```
 your-repo/
   other-memory/
-    instructions.md        rules the assistant reads and cannot edit
-    capture_rules.md       what to record, learned over time
-    facts/                 what is true about you
-    decisions/2026.md      append-only log, one file per year
-    messages/inbox/<name>/ notes waiting for an agent
-    messages/archive/      notes already acted on
+    facts/                     what is true, one folder per category
+    work/
+      ideas/{open,resolved}/       a thought worth keeping
+      proposals/{open,resolved}/   suggested, not yet ruled on
+      todos/{open,resolved}/       a task to be done
+    guidance/
+      instructions/            rules the assistant reads and cannot edit
+      capture_rules/           what to record, learned over time
+      mistakes/                where an agent got something wrong
+      decisions/               what was chosen and why, one dated file each
+    infrastructure/            machines and services rather than people
+    messages/inbox/<name>/     notes waiting for an agent
+    messages/archive/          notes already acted on
   ...anything else you keep in this repo, untouched
 ```
 
 This matters: you can point it at a repo that already has other things in it.
 The namespace also leaves room for other tools to claim their own top-level
 directory without colliding.
+
+**The shape inside is a suggestion, not a cage.** The server derives paths so
+that agents cannot invent their own conventions, but which folders exist is
+yours to change — the layout is defined in one file, `src/layout.ts`.
+
+Two ideas are worth keeping if you do rearrange it. **`ideas`, `proposals` and
+`todos` are stages, not categories**: a thing moves between them, and resolves
+in whichever stage it reached. And **a file never sits beside a folder holding
+files of its own kind** — that is why each stage has an `open/` rather than
+loose files next to `resolved/`.
 
 ## Ages are computed, never stored
 
@@ -314,7 +331,7 @@ assistant will keep calling the old schema and report features as missing.
 
 ## Instructions file
 
-The server reads `other-memory/instructions.md` but can never write to it. That
+The server reads `other-memory/guidance/instructions/` but can never write to it. That
 is where you put the rules you want the assistant to follow — what to record,
 what not to, how to phrase corrections. Yours to edit, not its to rewrite.
 

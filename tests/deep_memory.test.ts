@@ -20,16 +20,16 @@ import {
 const PATHS = [
   "other-memory/facts/core.md",
   "other-memory/facts/frodo.md",
-  "other-memory/future/todos/2026-08-13_do_something.md",
-  "other-memory/past/2026-08-12_finished_thing.md",
-  "other-memory/past/2026-08-12_another_finished_thing.md",
+  "other-memory/work/todos/open/2026-08-13_do_something.md",
+  "other-memory/work/todos/resolved/2026-08-12_finished_thing.md",
+  "other-memory/work/todos/resolved/2026-08-12_another_finished_thing.md",
   "other-memory/messages/inbox/ada/2026-08-13T00-00-00-000Z_kip_hello.md",
   "other-memory/messages/archive/kip/2026-08-01T00-00-00-000Z_ada_older.md",
 ];
 
 describe("isDeep", () => {
   test("resolved work is deep", () => {
-    expect(isDeep("other-memory/past/2026-08-12_finished_thing.md")).toBe(true);
+    expect(isDeep("other-memory/work/todos/resolved/2026-08-12_finished_thing.md")).toBe(true);
   });
 
   test("acted-on correspondence is deep", () => {
@@ -42,7 +42,7 @@ describe("isDeep", () => {
 
   test("an unresolved todo is not", () => {
     // The point is to hide what has already happened, not what is outstanding.
-    expect(isDeep("other-memory/future/todos/2026-08-13_do_something.md")).toBe(
+    expect(isDeep("other-memory/work/todos/open/2026-08-13_do_something.md")).toBe(
       false,
     );
   });
@@ -67,7 +67,7 @@ describe("applyDepth", () => {
   test("keeps current facts and outstanding work", () => {
     const shown = applyDepth(PATHS, { includeDeep: false });
     expect(shown).toContain("other-memory/facts/core.md");
-    expect(shown).toContain("other-memory/future/todos/2026-08-13_do_something.md");
+    expect(shown).toContain("other-memory/work/todos/open/2026-08-13_do_something.md");
   });
 });
 
@@ -77,7 +77,7 @@ describe("describeDeep", () => {
     // not know exists.
     const note = describeDeep(summariseDeep(PATHS));
     expect(note).toContain("3 further file(s)");
-    expect(note).toContain("past/");
+    expect(note).toContain("todos/resolved/");
     expect(note).toContain("messages/archive/");
   });
 
