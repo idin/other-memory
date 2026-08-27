@@ -183,11 +183,16 @@ Generate a client secret and keep both values.
 
 ### 4. Configure and deploy
 
+There is no source file to write. `wrangler.jsonc` points `main` straight
+into the package.
+
 ```sh
 mkdir my-memory-server && cd my-memory-server
 npm init -y
 npm install other-memory wrangler
 
+# The plain version. For search that matches meaning, and durable failure
+# and usage logs, use wrangler.d1.example.jsonc instead — see below.
 curl -o wrangler.jsonc \
   https://raw.githubusercontent.com/idin/other-memory/main/wrangler.example.jsonc
 # Fill in the REPLACE_WITH_ values.
@@ -198,16 +203,22 @@ npx wrangler kv namespace create OAUTH_KV
 npx wrangler deploy
 ```
 
-Point `main` in `wrangler.jsonc` at a one-line entry file:
+**With a database and embedding**, search matches meaning rather than
+spelling, the index is kept between sessions, and failures and API usage
+become rows you can query. Use the other example config, and create the
+database first:
 
-```ts
-// src/worker.ts
-export { default } from "other-memory/worker";
-export { MemoryMCP } from "other-memory";
+```sh
+curl -o wrangler.jsonc \
+  https://raw.githubusercontent.com/idin/other-memory/main/wrangler.d1.example.jsonc
+
+npx wrangler d1 create other-memory
+# Put the returned database_id into wrangler.jsonc.
 ```
 
-Both exports are needed: the default is the worker, and `MemoryMCP` is the
-Durable Object class your `wrangler.jsonc` binds by name.
+Every table is created on first write, so there is no migration step. Both
+bindings stay optional at runtime: without the database, failures go to the
+console; without `AI`, search falls back to matching words and says so.
 
 Then set the secrets. Piping them in keeps them out of your shell history:
 
@@ -218,11 +229,34 @@ openssl rand -hex 32              | npx wrangler secret put COOKIE_ENCRYPTION_KE
 printf %s "$MEMORY_REPO_TOKEN"    | npx wrangler secret put MEMORY_REPO_TOKEN
 ```
 
-Deploy once more, and add it on claude.ai under Settings → Connectors → Add
-custom connector, using your worker URL with `/sse` appended.
+**All four are required.** `COOKIE_ENCRYPTION_KEY` is the one that is easy to
+miss, because nothing complains until someone tries to log in: the OAuth
+provider uses it to sign the approval cookie, so without it `/authorize`
+returns 500 and the flow dies after GitHub rather than before it. The symptom
+is a client that sends you to GitHub, accepts the login, and still will not
+connect. Check with `npx wrangler secret list` — all four names should be
+there.
 
-Connectors are not enabled per conversation by default — turn it on from the
-"+" menu in each chat where you want it.
+Deploy once more, then connect a client.
+
+**claude.ai and the mobile apps:** Settings → Connectors → Add custom
+connector, using your worker URL with `/sse` appended. Connectors are not
+enabled per conversation by default — turn it on from the "+" menu in each
+chat where you want it.
+
+**Claude Code:**
+
+```sh
+claude mcp add --transport sse other-memory https://<your-worker>.workers.dev/sse
+```
+
+Then run `/mcp` inside Claude Code — it is a slash command typed at the Claude
+prompt, not a shell command — pick the server, and authenticate. `claude mcp
+list` shows whether it worked.
+
+Either way the first connection sends you to GitHub. Only the login named in
+`ALLOWED_GITHUB_LOGIN` is admitted; an authenticated stranger is still a
+stranger.
 
 ## Extending it
 
@@ -328,6 +362,21 @@ migration step. See `src/d1/` for the schemas.
 claude.ai caches the tool list when you connect. After deploying a change that
 adds or alters tools, disconnect and reconnect the connector, or the
 assistant will keep calling the old schema and report features as missing.
+
+### When a client will not connect
+
+Check the worker before suspecting the client. A properly-formed request to
+`/authorize` should answer 302, redirecting to GitHub:
+
+```sh
+curl -s -o /dev/null -w "%{http_code}\n" https://<your-worker>.workers.dev/.well-known/oauth-authorization-server
+npx wrangler secret list
+npx wrangler tail          # then reproduce the failure and watch
+```
+
+A 500 from `/authorize` on a real login attempt almost always means a missing
+secret — `COOKIE_ENCRYPTION_KEY` most often, since nothing else surfaces its
+absence. A 401 from `/sse` and `/mcp` is correct: those require a token.
 
 ## Instructions file
 
