@@ -247,16 +247,36 @@ chat where you want it.
 **Claude Code:**
 
 ```sh
-claude mcp add --transport sse other-memory https://<your-worker>.workers.dev/sse
+claude mcp add --scope user --transport sse other-memory https://<your-worker>.workers.dev/sse
 ```
 
-Then run `/mcp` inside Claude Code — it is a slash command typed at the Claude
-prompt, not a shell command — pick the server, and authenticate. `claude mcp
-list` shows whether it worked.
+`--scope user` makes it available in every project rather than only the
+directory you ran the command in — without it, `claude mcp list` from
+anywhere else will not even show the server.
 
-Either way the first connection sends you to GitHub. Only the login named in
-`ALLOWED_GITHUB_LOGIN` is admitted; an authenticated stranger is still a
-stranger.
+Then run `/mcp` inside Claude Code — a slash command typed at the Claude
+prompt, not a shell command — pick the server, and authenticate. The picker
+needs a real terminal; in the VS Code extension `/mcp` only prints a summary.
+`claude mcp list` shows whether it worked, and tools appear at the start of
+the next session, so restart after connecting.
+
+If you already added the same worker as a connector on claude.ai, it shows up
+in Claude Code too. Adding it again by hand just gives you two entries
+pointing at one server.
+
+**ChatGPT:** Settings → Plugins → Create (needs Developer Mode, and a paid
+plan). Use the worker URL with **`/mcp`** appended, not `/sse` — ChatGPT's
+connector path speaks Streamable HTTP. Set Authentication to OAuth and leave
+the advanced settings alone: the server advertises a `registration_endpoint`,
+so ChatGPT registers itself.
+
+"Connector name already exists" is a ChatGPT-side name collision, not a
+server error. It can happen even when no plugin by that name is visible in
+the list — rename the new one.
+
+Whichever client, the first connection sends you to GitHub. Only the login
+named in `ALLOWED_GITHUB_LOGIN` is admitted; an authenticated stranger is
+still a stranger.
 
 ## Extending it
 
