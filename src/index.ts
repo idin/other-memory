@@ -1,4 +1,6 @@
 import { McpAgent } from "agents/mcp";
+
+import { version as PACKAGE_VERSION } from "../package.json";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
@@ -143,7 +145,10 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
   server = new McpServer({
     name: "other-memory",
     title: "Other Memory",
-    version: "0.4.0",
+    // Read from the package rather than restated here. A hand-maintained copy
+    // drifts silently — this one sat at 0.4.0 across every release up to
+    // 2.5.0, because nothing fails when it is wrong.
+    version: PACKAGE_VERSION,
   });
 
   /**
