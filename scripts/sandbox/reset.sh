@@ -56,9 +56,9 @@ git config user.name "other-memory sandbox"
 # Commit one: the instructions, the rules, and the agent-name tokens. Dated
 # well before the rest, so a revert target exists that predates every fact
 # in the repository.
-mkdir -p other-memory
-cp -R "$fixture_directory/other-memory/instructions" other-memory/
-cp -R "$fixture_directory/other-memory/capture_rules" other-memory/
+mkdir -p other-memory/guidance
+cp -R "$fixture_directory/other-memory/guidance/instructions" other-memory/guidance/
+cp -R "$fixture_directory/other-memory/guidance/capture_rules" other-memory/guidance/
 cp -R "$fixture_directory/other-memory/hidden_from_agents" other-memory/
 git add -A
 GIT_AUTHOR_DATE="2026-01-05T10:00:00Z" GIT_COMMITTER_DATE="2026-01-05T10:00:00Z" \
@@ -71,13 +71,13 @@ GIT_AUTHOR_DATE="2026-01-12T14:30:00Z" GIT_COMMITTER_DATE="2026-01-12T14:30:00Z"
 	git commit --quiet -m "feat: record who this invented person is"
 
 # Commit three: the todo.
-cp -R "$fixture_directory/other-memory/future" other-memory/
+cp -R "$fixture_directory/other-memory/work" other-memory/
 git add -A
 GIT_AUTHOR_DATE="2026-01-15T09:05:00Z" GIT_COMMITTER_DATE="2026-01-15T09:05:00Z" \
 	git commit --quiet -m "feat: open a todo about the extractor fan"
 
 # Commit four: the decision log and the message.
-cp -R "$fixture_directory/other-memory/decisions" other-memory/
+cp -R "$fixture_directory/other-memory/guidance/decisions" other-memory/guidance/
 cp -R "$fixture_directory/other-memory/messages" other-memory/
 git add -A
 GIT_AUTHOR_DATE="2026-02-03T09:14:22Z" GIT_COMMITTER_DATE="2026-02-03T09:14:22Z" \

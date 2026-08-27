@@ -11,12 +11,8 @@
  * reports what is there and how much of it is undigested.
  */
 
-import { Octokit } from "octokit";
-
-import { githubClient } from "./github_client";
-
-import { MISTAKES_PREFIX } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
+import { readAllMistakeEntries } from "./mistake_entries";
 
 /**
  * Entries above which the server stops merely reporting the count and says a
@@ -53,28 +49,9 @@ export type MistakeSummary = {
 export async function summariseMistakes(
   config: MemoryRepoConfig,
 ): Promise<MistakeSummary> {
-  const octokit = githubClient(config.token);
-
-  let entries: string[];
+  let entries: Array<{ path: string; text: string }>;
   try {
-    const branch = await octokit.rest.repos.getBranch({
-      owner: config.owner,
-      repo: config.repo,
-      branch: config.branch,
-    });
-    const tree = await octokit.rest.git.getTree({
-      owner: config.owner,
-      repo: config.repo,
-      tree_sha: branch.data.commit.sha,
-      recursive: "true",
-    });
-    entries = (tree.data.tree ?? [])
-      .filter((node) => node.type === "blob")
-      .map((node) => node.path ?? "")
-      .filter(
-        (path) =>
-          path.startsWith(MISTAKES_PREFIX) && !path.endsWith("/README.md"),
-      );
+    entries = await readAllMistakeEntries(config);
   } catch {
     // No folder yet is the same state as no entries, and reporting an error
     // for a repository that simply has not made a mistake yet would be its own
@@ -82,11 +59,8 @@ export async function summariseMistakes(
     return { total: 0, undigested: 0, recommendation: null };
   }
 
-  const contents = await Promise.all(
-    entries.map((path) => readEntry(octokit, config, path)),
-  );
-  const undigested = contents.filter(
-    (text) => !text.includes(DIGESTED_MARKER),
+  const undigested = entries.filter(
+    (entry) => !entry.text.includes(DIGESTED_MARKER),
   ).length;
 
   return {
@@ -123,35 +97,4 @@ export function describeMistakeState(
   return `${summary.undigested} undigested mistake${
     summary.undigested === 1 ? "" : "s"
   }.`;
-}
-
-/**
- * Read one entry's text.
- *
- * @param octokit - Authenticated client.
- * @param config - Where the memory lives.
- * @param path - The entry to read.
- * @returns The file's text, or an empty string if it cannot be read — an
- *   unreadable entry counts as undigested, which errs toward reporting work
- *   rather than hiding it.
- */
-async function readEntry(
-  octokit: Octokit,
-  config: MemoryRepoConfig,
-  path: string,
-): Promise<string> {
-  try {
-    const file = await octokit.rest.repos.getContent({
-      owner: config.owner,
-      repo: config.repo,
-      path,
-      ref: config.branch,
-    });
-    if (Array.isArray(file.data) || file.data.type !== "file") {
-      return "";
-    }
-    return atob(file.data.content.replace(/\n/g, ""));
-  } catch {
-    return "";
-  }
 }

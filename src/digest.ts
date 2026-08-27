@@ -16,12 +16,8 @@
  * them and proposes; Idin rules; and only then does anything change.
  */
 
-import { Octokit } from "octokit";
-
-import { githubClient } from "./github_client";
-
-import { MISTAKES_PREFIX } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
+import { readAllMistakeEntries } from "./mistake_entries";
 import { DIGESTED_MARKER } from "./mistakes";
 
 export type DigestMaterial = {
@@ -83,45 +79,9 @@ entry describing the recurrence reads like any other entry.
 export async function gatherDigestMaterial(
   config: MemoryRepoConfig,
 ): Promise<DigestMaterial> {
-  const octokit = githubClient(config.token);
-
-  const branch = await octokit.rest.repos.getBranch({
-    owner: config.owner,
-    repo: config.repo,
-    branch: config.branch,
-  });
-  const tree = await octokit.rest.git.getTree({
-    owner: config.owner,
-    repo: config.repo,
-    tree_sha: branch.data.commit.sha,
-    recursive: "true",
-  });
-
-  const paths = (tree.data.tree ?? [])
-    .filter((node) => node.type === "blob")
-    .map((node) => node.path ?? "")
-    .filter(
-      (path) =>
-        path.startsWith(MISTAKES_PREFIX) && !path.endsWith("/README.md"),
-    )
-    .sort();
-
-  const entries: Array<{ path: string; text: string }> = [];
-  for (const path of paths) {
-    const file = await octokit.rest.repos.getContent({
-      owner: config.owner,
-      repo: config.repo,
-      path,
-      ref: config.branch,
-    });
-    if (Array.isArray(file.data) || file.data.type !== "file") {
-      continue;
-    }
-    const text = atob(file.data.content.replace(/\n/g, ""));
-    if (!text.includes(DIGESTED_MARKER)) {
-      entries.push({ path, text });
-    }
-  }
+  const entries = (await readAllMistakeEntries(config)).filter(
+    (entry) => !entry.text.includes(DIGESTED_MARKER),
+  );
 
   return { entries, instructions: DIGEST_INSTRUCTIONS };
 }

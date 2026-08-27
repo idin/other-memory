@@ -241,7 +241,11 @@ export const FIXTURE_CORE_FACTS = "other-memory/facts/core.md";
 
 /** The read-only file, which no write may touch. */
 export const FIXTURE_INSTRUCTIONS =
-  "other-memory/instructions/standing_instructions.md";
+  "other-memory/guidance/instructions/standing_instructions.md";
+
+/** The seeded todo, for the revert tests. */
+export const FIXTURE_TODO =
+  "other-memory/work/todos/open/2026-01-15_replace_extractor_fan.md";
 
 /** The seeded message, for the inbox tests. */
 export const FIXTURE_MESSAGE =

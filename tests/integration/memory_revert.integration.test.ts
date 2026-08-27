@@ -4,7 +4,7 @@ import { confirmationToken, isValidConfirmation } from "../../src/confirmation";
 import { readMemory } from "../../src/memory_repo";
 import { applyRevert, planRevert, revertOperation } from "../../src/memory_revert";
 import { createMemoryFile } from "../../src/memory_tree";
-import { eventually, resetSandbox, sandboxConfig } from "./sandbox";
+import { FIXTURE_TODO, eventually, resetSandbox, sandboxConfig } from "./sandbox";
 
 /**
  * Reverting is the destructive path, and the confirmation token is the thing
@@ -62,7 +62,7 @@ describe("planning a revert", () => {
   test("changes nothing on its own", async () => {
     await planRevert(config, BEFORE_THE_TODO);
 
-    const stillThere = await readMemory(config, "other-memory/future/todos/2026-01-15_replace_extractor_fan.md");
+    const stillThere = await readMemory(config, FIXTURE_TODO);
     expect(stillThere.content).toContain("extractor fan");
   });
 });
