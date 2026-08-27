@@ -67,3 +67,62 @@ considered, after he has ruled.
 Open. Found on 2026-08-27 while trying to close out the first digest, after
 Idin ruled that the entries with no mechanism should be marked digested with
 no rule emitted.
+
+## Fix applied
+
+`src/digest_marking.ts` provides `markEntriesDigested`, registered as the
+`record_digest_outcome` tool. It writes every entry in one commit through
+`commitTreeChanges` — a per-file append would cost two subrequests each, which
+at this log's size is the same ceiling that broke the gather it pairs with.
+
+Entries that produced nothing are accepted and marked, which is the rule the
+whole design rests on. Entries already carrying a marker are skipped rather
+than marked twice, and unknown paths are reported rather than silently
+ignored.
+
+## The guard that prevents recurrence
+
+Unit tests did not catch this bug, and could not have: `digestedNote` was
+correct. What was missing was the wiring, which is only visible from outside
+the module.
+
+`tests/every_write_path_is_reachable.source.test.ts` asserts that every
+capability the server means to expose is registered to a tool. Tamper-tested
+by renaming the tool as it effectively was before:
+
+```
+× markEntriesDigested is reachable through record_digest_outcome
+    Tests  1 failed | 4 passed (5)
+```
+
+and green once restored.
+
+## Verification
+
+Full suite:
+
+```
+Test Files  42 passed (42)
+     Tests  627 passed (627)
+```
+
+Published as `other-memory@2.5.0` and deployed (version
+`01310576-8120-4a50-aaae-4f526f914675`). Verified present in the installed
+tree before deploying, using the `verify-before-deploy` skill written earlier
+today:
+
+```
+version   ok  other-memory@2.5.0
+present   ok  'markEntriesDigested' in 2 file(s)
+present   ok  'record_digest_outcome' in 1 file(s)
+present   ok  'commitTreeChanges' in 4 file(s)
+Safe to deploy.
+```
+
+Live endpoints after deploy: discovery 200, mcp 401 unauthenticated.
+
+## Status
+
+Resolved 2026-08-27. The tool is live but not callable from the session that
+built it — an MCP client's tool list is fixed at connection time, so reaching
+a newly added tool needs a reconnect.
