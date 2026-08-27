@@ -30,14 +30,21 @@ export default defineConfig({
         test: {
           name: "worker",
           include: ["tests/**/*.test.ts"],
-          exclude: ["tests/**/*.integration.test.ts", "tests/secret_hygiene.test.ts"],
+          // `.source.test.ts` reads files from disk, which workerd cannot
+          // do. Routed by suffix rather than by filename so a new one lands
+          // in the right project without editing two lists.
+          exclude: [
+            "tests/**/*.integration.test.ts",
+            "tests/**/*.source.test.ts",
+            "tests/secret_hygiene.test.ts",
+          ],
         },
       },
       {
         test: {
           name: "repository",
           environment: "node",
-          include: ["tests/secret_hygiene.test.ts"],
+          include: ["tests/secret_hygiene.test.ts", "tests/**/*.source.test.ts"],
         },
       },
       {

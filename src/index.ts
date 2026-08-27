@@ -44,6 +44,7 @@ import {
   type Topic,
 } from "./topics";
 import {
+  buildFailure,
   consoleFailureSink,
   reportingFailures,
   type FailureSink,
@@ -256,7 +257,22 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
     this.registerMessageTools();
     this.registerDerivedTools();
     this.registerSearchTool();
-    await this.continueIndexBuild();
+    // Scheduled, never awaited. `init()` runs inside the Durable Object's
+    // blockConcurrencyWhile(), so anything awaited here delays every tool
+    // call on the connection — and a build long enough to exceed the wall
+    // clock gets the whole object cancelled and reset, which is a server
+    // that cannot be connected to at all rather than one whose search is
+    // briefly lexical.
+    //
+    // That is not hypothetical: a layout change on 2026-08-26 invalidated
+    // the index, and the rebuild it triggered on connect took down every
+    // client with `exceededWallTime`.
+    //
+    // The alarm does the same work a moment later and reschedules itself
+    // until the index is complete, so nothing is lost by not waiting. A
+    // search arriving before it finishes advances the build itself and says
+    // the index is partial.
+    await this.schedule(0, "continueIndexBuild");
   }
 
   /**
@@ -270,11 +286,28 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
    * so it must stay a real method, not a private closure.
    */
   async continueIndexBuild(): Promise<void> {
-    const { complete } = await advanceIndexBuild(
-      this.repoConfig(),
-      this.memoryIndex,
-      this.embedder(),
-    );
+    let complete = false;
+    try {
+      ({ complete } = await advanceIndexBuild(
+        this.repoConfig(),
+        this.memoryIndex,
+        this.embedder(),
+      ));
+    } catch (error) {
+      // Never let this escape. It runs from an alarm, where a throw means the
+      // alarm retries — and a build that fails for a durable reason would
+      // retry forever. Recorded like any other failure, then rescheduled at
+      // the ordinary interval so a transient cause still resolves itself.
+      await this.failureSink(
+        buildFailure({
+          tool: "continueIndexBuild",
+          args: {},
+          error,
+          login: null,
+          timestamp: new Date(Date.now()).toISOString(),
+        }),
+      );
+    }
     if (!complete) {
       await this.schedule(ALARM_RETRY_DELAY_SECONDS, "continueIndexBuild");
     }
