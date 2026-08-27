@@ -110,3 +110,59 @@ Worth knowing before digging:
   any other directory.
 - A deploy does **not** invalidate OAuth tokens. Changing
   `COOKIE_ENCRYPTION_KEY` does.
+
+## Per-item work has a ceiling, and it arrives late
+
+A Cloudflare Worker may make at most 50 subrequests per invocation. Anything
+that reads one file per item is fine in testing and fails once the store grows
+past the cap — long after the code was written, with nothing having changed.
+
+On 2026-08-27 the digest read one file per mistake entry. At 45 entries it
+needed 47 subrequests and failed outright:
+
+```
+Too many subrequests by single Worker invocation.
+```
+
+Two properties made it worse than a broken tool:
+
+- **It failed exactly when it was needed.** The digest exists to compress a log
+  that has grown, so it broke at the moment it became worth running.
+- **The count that rides along with every tool response read the same way.**
+  Every tool on the server was one entry from the same ceiling.
+
+The fix was GraphQL with aliased `Blob` objects: every file's text in one
+request, so the cost is constant. A batch size would only have moved the
+ceiling — any fixed batch is exceeded by a large enough store.
+
+The obvious cheaper fix does not work, and is worth ruling out early: a
+GitHub directory listing returns metadata only, with no `content` field.
+
+## A function nothing calls is not a feature
+
+`digestedNote` was written, exported, and unit-tested. No tool ever called it.
+The marker it produced was read by two filters and written by nothing, so the
+digest loop ran one way only: entries could be gathered, never marked. The
+store reached 47 mistakes with 0 digested.
+
+Unit tests could not have caught it, because the function was correct. What
+was missing was the wiring, which is only visible from outside the module.
+
+When a capability exists but has never demonstrably run, check that something
+reaches it before assuming it works.
+
+## Two copies of a layout can agree with each other and both be wrong
+
+After a layout reorg, the test fixture, the constant naming a path inside it,
+and the sandbox reset script were all left on the old paths. Nothing failed,
+because they agreed with each other.
+
+Two integration tests assert the read-only guard refuses writes to the
+instructions folder. With the fixture outside the guarded prefix, those writes
+succeeded — the tests had stopped exercising the guard and begun exercising an
+unprotected path. They failed loudly only because they asserted rejection.
+Written the other way round, the suite would have stayed green while checking
+nothing.
+
+Fixtures, setup scripts and path constants are all copies of the layout. Check
+them against the layout constants themselves, never against a second list.
