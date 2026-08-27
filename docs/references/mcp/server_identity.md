@@ -81,10 +81,68 @@ server. Clients may pass it to the model as context.
 
 ## Icons
 
-`Implementation` also carries an optional `icons` field. Claude.ai does not
-render icons for custom connectors — every custom connector gets a generic
-one, and branded icons are configured by Anthropic for first-party listings
-only. So the name carries all the identification.
+`Implementation` carries an optional `icons` array, introduced by SEP-973 and
+first specified in revision `2025-11-25`. The same field is accepted on tools,
+prompts, resources and resource templates, so a server can give each of them
+its own icon rather than only branding itself.
+
+### Schema
+
+```ts
+type Icon = {
+  src: string;                  // required
+  mimeType?: string;            // e.g. "image/png", "image/svg+xml"
+  sizes?: string[];             // "48x48", or "any" for scalable formats
+  theme?: "light" | "dark";
+};
+```
+
+- **`src`** is a URI: `http(s):` or a `data:` URI with base64 image data. A
+  `data:` URI is self-contained, which matters for a server whose domain a
+  client may not want to fetch from.
+- **`sizes`** omitted means the icon may be used at any size.
+- **`theme`** omitted means the icon suits either background. Supplying two
+  entries, one per theme, is how a server offers both.
+
+Declared through the `McpServer` constructor alongside the other identity
+fields:
+
+```ts
+new McpServer({
+  name: "other-memory",
+  title: "Other Memory",
+  version: "2.5.0",
+  icons: [{ src: "data:image/svg+xml;base64,...", mimeType: "image/svg+xml",
+            sizes: ["any"] }],
+});
+```
+
+The installed `@modelcontextprotocol/sdk` carries `icons` on its
+`BaseMetadata`-derived schemas, so this typechecks without any version bump.
+
+### Security guidance from the spec
+
+Two warnings, both aimed at the consuming client rather than the server:
+
+> Consumers SHOULD take steps to ensure URLs serving icons are from the same
+> domain as the client/server or a trusted domain.
+
+> Consumers SHOULD take appropriate precautions when consuming SVGs as they
+> can contain executable JavaScript.
+
+The second is the reason a client may decline to render an SVG at all, and a
+reason to prefer PNG for an icon that must be shown.
+
+### What claude.ai actually does with it
+
+Nothing, for custom connectors. Every custom connector renders a generic icon
+regardless of what the server advertises; branded icons are configured by
+Anthropic for first-party listings. Sending `icons` is harmless and
+spec-correct, but it changes nothing a person sees.
+
+Re-checked 2026-08-27, and the request is still open upstream. So for a custom
+connector the **name carries all the identification** — which is why the name
+is worth getting right and the icon is not worth waiting for.
 
 ## Sources
 
@@ -95,3 +153,11 @@ only. So the name carries all the identification.
   to a UUID instead of the advertised name
 - https://github.com/anthropics/claude-ai-mcp/issues/152 — icons not rendered
   for custom connectors
+- https://modelcontextprotocol.io/specification/draft/schema — the `Icon` type,
+  its fields, and the SVG and trusted-domain warnings
+- https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2573
+  — displaying branded icons for a custom MCP server
+- https://github.com/anthropics/claude-code/issues/44675 — custom connectors
+  not rendering description or icons from server metadata
+- https://github.com/anthropics/claude-code/issues/49040 — custom icons for
+  MCP servers and marketplace plugins
