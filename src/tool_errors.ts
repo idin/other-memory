@@ -144,6 +144,26 @@ export const consoleFailureSink: FailureSink = (failure: ToolFailure) => {
 };
 
 /**
+ * Whether a failure message is GitHub refusing for rate reasons.
+ *
+ * Kept here rather than imported from `memory_repo` on purpose: this module
+ * is what every tool funnels its errors through, and it must not depend on
+ * the module whose calls it is reporting on. `isRateLimited` there decides
+ * how long to wait; this decides what to tell the caller.
+ *
+ * @param message - The failure message.
+ * @returns True when the message describes a rate limit.
+ */
+function isRateLimitMessage(message: string): boolean {
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("rate limit")
+    || lowered.includes("quota exhausted")
+    || lowered.includes("secondary rate")
+  );
+}
+
+/**
  * Run a tool handler, reporting any failure rather than throwing.
  *
  * @param options.tool - Name of the tool being run.
@@ -186,16 +206,25 @@ export async function reportingFailures<Result>(options: {
         }),
       );
     }
+    // A rate limit is not a bug in the call, and saying so stops an agent
+    // retrying into the wall or reporting an empty store as an answer. The
+    // reset time is the one fact that makes the message actionable.
+    const rateLimitReset = (error as { response?: { headers?: Record<string, string> } })
+      ?.response?.headers?.["x-ratelimit-reset"];
+    const resetNote = rateLimitReset
+      ? ` The limit resets at ${new Date(Number(rateLimitReset) * 1000).toISOString()}.`
+      : "";
+    const explanation = isRateLimitMessage(failure.message)
+      ? `The ${tool} tool could not run: GitHub's API rate limit is `
+        + `exhausted, so the memory could not be read.${resetNote} Nothing is `
+        + "wrong with the store — tell the user to try again after the reset, "
+        + "and do not treat this as an empty or missing result."
+      : `The ${tool} tool failed: ${failure.message}\n\n`
+        + "This has been logged. Tell the user the call failed rather than "
+        + "treating the absence of a result as an answer.";
+
     return {
-      content: [
-        {
-          type: "text" as const,
-          text:
-            `The ${tool} tool failed: ${failure.message}\n\n` +
-            "This has been logged. Tell the user the call failed rather than " +
-            "treating the absence of a result as an answer.",
-        },
-      ],
+      content: [{ type: "text" as const, text: explanation }],
       isError: true,
     };
   }

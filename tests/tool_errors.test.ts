@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, test } from "vitest";
 
 import {
   buildFailure,
@@ -190,5 +190,69 @@ describe("buildFailure", () => {
     // caused it, so an unencodable argument must not throw in turn.
     expect(failure.message).toBe("nope");
     expect(failure.arguments).toBe('"[unencodable]"');
+  });
+});
+
+/**
+ * When GitHub's rate limit is exhausted, every tool that reads the store
+ * fails. On 2026-08-26 that surfaced to the user as a spinner that never
+ * resolved, then a raw Octokit message — neither of which says the store is
+ * fine and the call should be retried later.
+ */
+describe("a rate-limited failure explains itself", () => {
+  const sink = () => {};
+
+  test("says the store is fine and to retry", async () => {
+    const result = await reportingFailures({
+      tool: "list_memory_files",
+      args: {},
+      login: "idin",
+      sink,
+      run: async () => {
+        throw new Error(
+          "Request quota exhausted for request GET /repos/{owner}/{repo}/branches/{branch}",
+        );
+      },
+    });
+
+    const text = (result as { content: [{ text: string }] }).content[0].text;
+    expect(text).toContain("rate limit");
+    // The part that stops an agent reporting an empty memory as the answer.
+    expect(text).toContain("Nothing is wrong with the store");
+    expect(text).not.toContain("This has been logged");
+  });
+
+  test("reports the reset time when GitHub sends one", async () => {
+    const resetAt = 1787800000;
+    const result = await reportingFailures({
+      tool: "read_memory",
+      args: {},
+      login: "idin",
+      sink,
+      run: async () => {
+        throw Object.assign(new Error("API rate limit exceeded"), {
+          response: { headers: { "x-ratelimit-reset": String(resetAt) } },
+        });
+      },
+    });
+
+    const text = (result as { content: [{ text: string }] }).content[0].text;
+    expect(text).toContain(new Date(resetAt * 1000).toISOString());
+  });
+
+  test("an ordinary failure still reports normally", async () => {
+    const result = await reportingFailures({
+      tool: "read_memory",
+      args: {},
+      login: "idin",
+      sink,
+      run: async () => {
+        throw new Error("Not Found");
+      },
+    });
+
+    const text = (result as { content: [{ text: string }] }).content[0].text;
+    expect(text).toContain("This has been logged");
+    expect(text).not.toContain("rate limit");
   });
 });
