@@ -8,6 +8,7 @@ import {
   appendMemory,
   describeAppendablePaths,
   describeReadablePaths,
+  isRateLimited,
   readMemory,
   type MemoryRepoConfig,
 } from "./memory_repo";
@@ -66,6 +67,7 @@ import {
 import {
   ALARM_RETRY_DELAY_SECONDS,
   DEFAULT_SEARCH_QUOTAS,
+  RATE_LIMITED_RETRY_DELAY_SECONDS,
   type SearchQuotas,
 } from "./search_config";
 import {
@@ -272,7 +274,14 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
     // until the index is complete, so nothing is lost by not waiting. A
     // search arriving before it finishes advances the build itself and says
     // the index is partial.
-    await this.schedule(0, "continueIndexBuild");
+    // `idempotent` matters as much as not awaiting. Without it every restart
+    // of the Durable Object adds another scheduled row, so a server that
+    // restarts often ends up running several builds at once — each reading
+    // the whole store from GitHub, which is how the API rate limit was
+    // exhausted within an hour of this being introduced.
+    await this.schedule(0, "continueIndexBuild", undefined, {
+      idempotent: true,
+    });
   }
 
   /**
@@ -287,6 +296,7 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
    */
   async continueIndexBuild(): Promise<void> {
     let complete = false;
+    let retryAfterSeconds = ALARM_RETRY_DELAY_SECONDS;
     try {
       ({ complete } = await advanceIndexBuild(
         this.repoConfig(),
@@ -296,8 +306,8 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
     } catch (error) {
       // Never let this escape. It runs from an alarm, where a throw means the
       // alarm retries — and a build that fails for a durable reason would
-      // retry forever. Recorded like any other failure, then rescheduled at
-      // the ordinary interval so a transient cause still resolves itself.
+      // retry forever. Recorded like any other failure, then rescheduled so a
+      // transient cause still resolves itself.
       await this.failureSink(
         buildFailure({
           tool: "continueIndexBuild",
@@ -307,9 +317,17 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
           timestamp: new Date(Date.now()).toISOString(),
         }),
       );
+      // A rate-limited build is making no progress, and the ordinary five
+      // seconds spends the very quota it is waiting on. Backing off is the
+      // only thing that lets it recover.
+      if (isRateLimited(error)) {
+        retryAfterSeconds = RATE_LIMITED_RETRY_DELAY_SECONDS;
+      }
     }
     if (!complete) {
-      await this.schedule(ALARM_RETRY_DELAY_SECONDS, "continueIndexBuild");
+      await this.schedule(retryAfterSeconds, "continueIndexBuild", undefined, {
+        idempotent: true,
+      });
     }
   }
 

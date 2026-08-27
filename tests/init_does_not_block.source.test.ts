@@ -31,7 +31,19 @@ describe("init does not await the index build", () => {
   });
 
   test("init schedules the build instead", () => {
-    expect(source).toContain('this.schedule(0, "continueIndexBuild")');
+    expect(source).toContain('this.schedule(0, "continueIndexBuild"');
+  });
+
+  test("the scheduled build is idempotent", () => {
+    // Without this, every Durable Object restart adds another scheduled row,
+    // so several builds run at once — each reading the whole store from
+    // GitHub. That exhausted the API rate limit within an hour of the
+    // scheduling change being introduced.
+    const call = source.slice(
+      source.indexOf('this.schedule(0, "continueIndexBuild"'),
+      source.indexOf('this.schedule(0, "continueIndexBuild"') + 200,
+    );
+    expect(call).toContain("idempotent: true");
   });
 
   test("continueIndexBuild swallows its own failures", () => {

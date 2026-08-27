@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  isRateLimited,
   assertAppendable,
   assertReadable,
   describeAppendablePaths,
@@ -103,5 +104,58 @@ describe("path descriptions", () => {
   test("appendable description excludes the instructions file", () => {
     expect(describeAppendablePaths()).toContain("instructions/");
     expect(describeAppendablePaths()).toContain("except");
+  });
+});
+
+/**
+ * An index rebuild exhausted GitHub's API allowance on 2026-08-26 and left
+ * every tool hanging on "taking longer than expected". The build retried
+ * every five seconds — the pacing interval for a build making progress —
+ * which spent the quota it was waiting on.
+ *
+ * Backing off requires telling "GitHub is refusing for now" apart from
+ * "GitHub is refusing permanently". A 403 is both, so the wording decides.
+ */
+describe("isRateLimited", () => {
+  test("the per-endpoint quota message is rate limiting", () => {
+    expect(
+      isRateLimited(
+        new Error(
+          "Request quota exhausted for request GET /repos/{owner}/{repo}/branches/{branch}",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  test("the primary hourly limit is rate limiting", () => {
+    expect(isRateLimited(new Error("API rate limit exceeded"))).toBe(true);
+  });
+
+  test("a secondary limit is rate limiting", () => {
+    expect(
+      isRateLimited(new Error("You have exceeded a secondary rate limit")),
+    ).toBe(true);
+  });
+
+  test("a 429 is rate limiting whatever it says", () => {
+    expect(isRateLimited(Object.assign(new Error("slow down"), { status: 429 }))).toBe(
+      true,
+    );
+  });
+
+  test("a 403 for permissions is not rate limiting", () => {
+    // The distinction the backoff rests on. Waiting does not grant a token
+    // permissions it never had, so this must keep the ordinary retry.
+    expect(
+      isRateLimited(
+        Object.assign(new Error("Resource not accessible by personal access token"), {
+          status: 403,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  test("an ordinary failure is not rate limiting", () => {
+    expect(isRateLimited(new Error("Not Found"))).toBe(false);
   });
 });

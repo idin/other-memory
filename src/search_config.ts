@@ -166,6 +166,20 @@ export const FILES_INDEXED_PER_SEARCH = 12;
 export const ALARM_RETRY_DELAY_SECONDS = 5;
 
 /**
+ * How long to wait after the GitHub API refuses for rate reasons.
+ *
+ * The ordinary five seconds is pacing for a build that is making progress.
+ * A rate-limited build is making none, and retrying at that interval spends
+ * the quota it is waiting on — which is how a rebuild exhausted an hour of
+ * GitHub's allowance on 2026-08-26 and left every tool hanging.
+ *
+ * A minute is chosen against GitHub's own reset granularity: primary limits
+ * reset hourly, secondary ones clear in tens of seconds, so this recovers
+ * quickly from the common case without hammering the rare one.
+ */
+export const RATE_LIMITED_RETRY_DELAY_SECONDS = 60;
+
+/**
  * How many neighbouring chunks may be attached to one result.
  *
  * A chunk opening with "It" or "They" depends on the one before it, and

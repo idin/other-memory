@@ -152,3 +152,37 @@ export async function appendMemory(
   };
 }
 
+
+/**
+ * Whether an error means GitHub is refusing for rate reasons.
+ *
+ * Distinguished from every other failure because the response differs: a
+ * rate limit is temporary and says nothing about the request, so the only
+ * useful reaction is to wait. Retrying at the ordinary pace spends the quota
+ * being waited on, which is how an index rebuild exhausted an hour of the
+ * API allowance on 2026-08-26 and left every tool hanging.
+ *
+ * Octokit reports these as 403 or 429, and the message wording varies
+ * between the primary hourly limit, secondary abuse limits, and the
+ * per-endpoint request quota — so both are matched.
+ *
+ * @param error - Whatever was thrown.
+ * @returns True when GitHub is rate limiting rather than rejecting.
+ */
+export function isRateLimited(error: unknown): boolean {
+  const status = (error as { status?: number } | null)?.status;
+  if (status === 429) {
+    return true;
+  }
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  // Matched on wording rather than on the 403 alone, because a 403 is also
+  // how GitHub answers a token that lacks permission — durable, and not
+  // something waiting would fix.
+  return (
+    message.includes("rate limit")
+    || message.includes("quota exhausted")
+    || message.includes("secondary rate")
+    || message.includes("abuse detection")
+  );
+}
