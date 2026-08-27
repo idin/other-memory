@@ -141,3 +141,35 @@ AssertionError: reset.sh copies instructions, absent from fixture
 ```
 
 Both restored to green afterwards.
+
+## A third stale path, found on the next run
+
+After the fixture and reset script were fixed, one integration test still
+failed:
+
+```
+FAIL |integration| memory_revert.integration.test.ts > planning a revert
+  > changes nothing on its own
+HttpError: Not Found - .../repos/contents
+```
+
+It read `other-memory/future/todos/2026-01-15_replace_extractor_fan.md` as a
+string literal in the test body. Repointed at a new `FIXTURE_TODO` constant in
+`sandbox.ts`, beside the other fixture constants, so the path lives in one
+place rather than being repeated as a literal.
+
+A sweep for every other stale prefix across `tests/` and `scripts/` found no
+further instances.
+
+## Final verification
+
+Full suite, integration included:
+
+```
+Test Files  40 passed (40)
+     Tests  618 passed (618)
+```
+
+## Status
+
+Resolved 2026-08-27.

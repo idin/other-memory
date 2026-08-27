@@ -125,3 +125,35 @@ restored:             Tests  5 passed (5)
 ## Status
 
 Resolved 2026-08-27.
+
+## Confirmed live
+
+Published as `other-memory@2.4.6` and deployed
+(version `9aad5b2f-c5f6-4bef-9ebe-b15c7d0b6146`).
+
+The fix was verified present in the installed tree before deploying, not
+assumed from the version number:
+
+```
+mistake_entries.ts               shipped (4445 bytes)
+graphql / "on Blob" in it        2 / 1
+readAllMistakeEntries in callers digest.ts 2, mistakes.ts 2
+repos.getContent in callers      0, 0
+```
+
+That check mattered: the first `npm install other-memory@2.4.6` failed on
+registry lag (`ETARGET`) and left the tree on 2.4.5. Deploying on the version
+number alone would have shipped the old code, which is exactly how 2.4.1 was
+deployed in place of 2.4.2 on 2026-08-26.
+
+`gather_all_undigested_ai_mistakes` then ran against the live server and
+returned all 47 entries, 71.9 KB — the same call that failed an hour earlier
+with "Too many subrequests by single Worker invocation".
+
+Live endpoint checks after deploy:
+
+```
+discovery      200
+mcp endpoint   401 (unauthenticated, as expected)
+github quota   2743/5000
+```
