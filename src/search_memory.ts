@@ -19,7 +19,8 @@ import { chunkFile, chunkSearchText, type MemoryChunk } from "./chunking";
 import {
   EMBEDDING_MODEL,
   EMBEDDING_POOLING,
-  embedChunks,
+  embedChunksOrExplain,
+  isEmbedderUnavailable,
   searchSemantically,
   type Embedder,
   type SemanticHit,
@@ -199,9 +200,20 @@ async function currentChunks(
 
     for (const file of batch) {
       const chunks = chunkFile(file);
-      const embedded = embed
-        ? await embedChunks(chunks, embed)
-        : chunks.map((chunk) => ({ chunk, vector: null }));
+      const { embedded, unavailable } = await embedChunksOrExplain(chunks, embed);
+      if (unavailable) {
+        // Store what was read without vectors and stop embedding for this
+        // round. Continuing would spend a call per file to be refused each
+        // time, and the files already written stay indexed lexically.
+        await index.replaceFile(identity, file.path, embedded);
+        return {
+          indexed: await index.load(identity),
+          mode: "full",
+          reason:
+            `${PARTIAL_INDEX_PREFIX}Embedding is unavailable, so search is `
+            + `matching words rather than meaning: ${unavailable}`,
+        };
+      }
       await index.replaceFile(identity, file.path, embedded);
     }
 
@@ -283,10 +295,19 @@ async function currentChunks(
       continue;
     }
     const chunks = chunkFile(file);
-    const embedded = embed
-      ? await embedChunks(chunks, embed)
-      : chunks.map((chunk) => ({ chunk, vector: null }));
+    const { embedded, unavailable } = await embedChunksOrExplain(chunks, embed);
     await index.replaceFile(identity, change.path, embedded);
+    if (unavailable) {
+      // Same reasoning as the full build: stop asking an embedder that is
+      // refusing, and say why rather than failing the search.
+      return {
+        indexed: await index.load(identity),
+        mode: plan.mode,
+        reason:
+          `${PARTIAL_INDEX_PREFIX}Embedding is unavailable, so search is `
+          + `matching words rather than meaning: ${unavailable}`,
+      };
+    }
   }
 
   const unprocessed = plan.changes.length - FILES_INDEXED_PER_SEARCH;
@@ -388,15 +409,30 @@ export async function searchMemory(
   const exactCount = lexical.filter((hit) => hit.scores.exact > 0).length;
 
   let semantic: ReturnType<typeof searchSemantically> = [];
+  let embedderUnavailable: string | null = null;
   const semanticAvailable = embed !== null && visible.some((one) => one.vector);
   if (embed && semanticAvailable) {
-    const [queryVector] = await embed([options.query]);
-    // Wide enough that the tiers above it can take their share without
-    // starving the semantic quota — the pool is cut before the cascade runs,
-    // so it must account for what earlier tiers will claim from it.
-    semantic = searchSemantically(visible, queryVector, {
-      limit: cosinePoolSize(options.quotas, exactCount),
-    });
+    let queryVector: Float32Array | undefined;
+    try {
+      [queryVector] = await embed([options.query]);
+    } catch (error) {
+      if (!isEmbedderUnavailable(error)) {
+        throw error;
+      }
+      // The store may be fully indexed and only this one call refused. The
+      // lexical half still answers, so the search returns rather than fails,
+      // and the caller is told the semantic half is missing.
+      embedderUnavailable =
+        error instanceof Error ? error.message : String(error);
+    }
+    if (queryVector) {
+      // Wide enough that the tiers above it can take their share without
+      // starving the semantic quota — the pool is cut before the cascade
+      // runs, so it must account for what earlier tiers will claim from it.
+      semantic = searchSemantically(visible, queryVector, {
+        limit: cosinePoolSize(options.quotas, exactCount),
+      });
+    }
   }
 
   // The full round, before the cascade cuts it down by quota — every
@@ -419,9 +455,15 @@ export async function searchMemory(
   return {
     results,
     searched: indexed.map((entry) => entry.chunk),
-    semanticAvailable,
+    // The store has vectors, but this query could not be embedded, so the
+    // semantic half did not run. Reported as unavailable because that is
+    // what it was for this search.
+    semanticAvailable: semanticAvailable && !embedderUnavailable,
     indexMode: mode,
-    indexReason: reason,
+    indexReason: embedderUnavailable
+      ? `${PARTIAL_INDEX_PREFIX}Embedding is unavailable, so this search `
+        + `matched words rather than meaning: ${embedderUnavailable}`
+      : reason,
   };
 }
 

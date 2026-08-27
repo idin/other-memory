@@ -329,3 +329,78 @@ export async function embedChunks(
   const vectors = await embed(chunks.map((chunk) => chunkSearchText(chunk)));
   return chunks.map((chunk, index) => ({ chunk, vector: vectors[index] }));
 }
+
+/**
+ * Whether an error means the embedding service is refusing work rather than
+ * the request being wrong.
+ *
+ * A quota that has run out, a rate limit, a service that is down: none of
+ * these say anything about the text handed over, and all of them are
+ * temporary. The distinction matters because the response differs — an
+ * unavailable embedder means fall back to lexical search and say so, while a
+ * text that cannot be embedded is a bug worth surfacing.
+ *
+ * Matched on the message because Workers AI reports these as a plain `Error`
+ * carrying a numeric code, with no typed class to catch. 4006 is the daily
+ * neuron allowance; the rest are matched by wording.
+ *
+ * @param error - Whatever was thrown.
+ * @returns True when the embedder is unavailable rather than misused.
+ */
+export function isEmbedderUnavailable(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("4006")
+    || message.includes("daily free allocation")
+    || message.includes("capacity temporarily exceeded")
+    || message.includes("rate limit")
+    || message.includes("too many requests")
+  );
+}
+
+/**
+ * Embed what can be embedded, and report it when nothing can.
+ *
+ * The whole point of the vectors is that an empty result reads as "not
+ * recorded" rather than "asked using different words", so losing them
+ * degrades search. Losing the *server* is worse: an exhausted quota used to
+ * escape as an exception and take down the connection that was trying to
+ * rebuild the index, which made an optional feature able to break a
+ * deployment that never asked for it.
+ *
+ * So an unavailable embedder returns chunks with no vectors and a reason to
+ * show the caller. Anything else still throws — a text that cannot be
+ * embedded is a bug, not a fallback.
+ *
+ * @param chunks - What to embed.
+ * @param embed - The embedder, or null when the deployment has none.
+ * @returns The chunks with vectors where possible, and why not when absent.
+ */
+export async function embedChunksOrExplain(
+  chunks: MemoryChunk[],
+  embed: Embedder | null,
+): Promise<{
+  embedded: { chunk: MemoryChunk; vector: Float32Array | null }[];
+  unavailable: string | null;
+}> {
+  if (!embed) {
+    return {
+      embedded: chunks.map((chunk) => ({ chunk, vector: null })),
+      unavailable: null,
+    };
+  }
+  try {
+    return { embedded: await embedChunks(chunks, embed), unavailable: null };
+  } catch (error) {
+    if (!isEmbedderUnavailable(error)) {
+      throw error;
+    }
+    return {
+      embedded: chunks.map((chunk) => ({ chunk, vector: null })),
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
+  }
+}

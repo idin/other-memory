@@ -7,6 +7,8 @@ import {
   TextTooLongToEmbedError,
   cosineSimilarity,
   embedChunks,
+  embedChunksOrExplain,
+  isEmbedderUnavailable,
   searchSemantically,
   workersAiEmbedder,
   type WorkersAi,
@@ -244,5 +246,72 @@ describe("embedChunks", () => {
       workersAiEmbedder(ai, NO_USAGE),
     );
     expect(ai.calls[0].text[0]).toContain("second-hand");
+  });
+});
+
+/**
+ * A deployment ran out of its daily Workers AI allowance mid-rebuild on
+ * 2026-08-26. The quota error escaped as an exception, took down the MCP
+ * connection, and every client reported only that the server "returned an
+ * error when connecting" — an optional feature breaking a deployment that
+ * had not asked for it.
+ *
+ * Embedding is meant to degrade to lexical search and say so. These tests
+ * pin that: refusal by the service is a fallback, refusal of the text is a
+ * bug and still throws.
+ */
+describe("an embedder that refuses work", () => {
+  const QUOTA_ERROR = new Error(
+    "AiError: 4006: you have used up your daily free allocation of 10,000 "
+      + "neurons, please upgrade to Cloudflare's Workers Paid plan if you "
+      + "would like to continue usage.",
+  );
+
+  test("the daily allowance running out is recognised as unavailable", () => {
+    expect(isEmbedderUnavailable(QUOTA_ERROR)).toBe(true);
+  });
+
+  test("a rate limit is recognised as unavailable", () => {
+    expect(isEmbedderUnavailable(new Error("Rate limit exceeded"))).toBe(true);
+  });
+
+  test("a text that cannot be embedded is not unavailability", () => {
+    // The distinction the whole guard rests on: this one is a bug and must
+    // keep throwing rather than silently producing an unsearchable store.
+    expect(isEmbedderUnavailable(new TextTooLongToEmbedError(9000, "x"))).toBe(
+      false,
+    );
+  });
+
+  test("chunks come back without vectors, and with the reason", async () => {
+    const { embedded, unavailable } = await embedChunksOrExplain(
+      [chunk({ text: "a toy poodle called Frodo" })],
+      async () => {
+        throw QUOTA_ERROR;
+      },
+    );
+
+    expect(embedded).toHaveLength(1);
+    expect(embedded[0].vector).toBeNull();
+    // Without this the caller cannot tell a store that holds nothing from one
+    // it could not search properly.
+    expect(unavailable).toContain("daily free allocation");
+  });
+
+  test("an error that is not unavailability still throws", async () => {
+    await expect(
+      embedChunksOrExplain([chunk({ text: "anything" })], async () => {
+        throw new TextTooLongToEmbedError(9000, "anything");
+      }),
+    ).rejects.toThrow(TextTooLongToEmbedError);
+  });
+
+  test("no embedder at all is not an error", async () => {
+    const { embedded, unavailable } = await embedChunksOrExplain(
+      [chunk({ text: "a toy poodle" })],
+      null,
+    );
+    expect(embedded[0].vector).toBeNull();
+    expect(unavailable).toBeNull();
   });
 });
