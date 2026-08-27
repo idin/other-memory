@@ -19,6 +19,7 @@ import {
 } from "./comparisons";
 import { applyDepth, describeDeep, summariseDeep } from "./deep_memory";
 import { gatherDigestMaterial } from "./digest";
+import { markEntriesDigested } from "./digest_marking";
 import { applyRevert, planRevert, revertOperation } from "./memory_revert";
 import {
   describeMistakeState,
@@ -1132,6 +1133,79 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
             },
           ],
         };
+      },
+    );
+
+    this.registerTool(
+      "record_digest_outcome",
+      {
+        description:
+          "Record what a digest decided, marking the entries it considered so "
+          + "they do not resurface at every future digest. Call this ONLY "
+          + "after the user has ruled on a digest's proposals — it records "
+          + "their decision, it does not make one. Entries that produced no "
+          + "rule must be included: an entry the digest considered and "
+          + "deliberately answered with nothing still needs marking, or the "
+          + "count never falls and the same entries are reconsidered forever. "
+          + "Marking is also what makes recurrence visible later — a pattern "
+          + "that reappears after a rule was written to prevent it means that "
+          + "rule failed, which is the most valuable thing a digest can find.",
+        inputSchema: {
+          date: z
+            .string()
+            .describe("The digest's date, as YYYY-MM-DD."),
+          outcomes: z
+            .array(
+              z.object({
+                path: z
+                  .string()
+                  .describe(
+                    "Repo-relative path of the mistake entry, as returned by "
+                    + "gather_all_undigested_ai_mistakes.",
+                  ),
+                produced: z
+                  .array(z.string())
+                  .describe(
+                    "What this entry contributed to — a rule, a skill, a "
+                    + "validator. Empty when the digest deliberately emitted "
+                    + "nothing for it.",
+                  ),
+              }),
+            )
+            .describe("One outcome per entry the digest considered."),
+          commit_message: z
+            .string()
+            .describe(
+              "Conventional Commits format, e.g. 'docs: record digest of 47 mistakes'",
+            ),
+        },
+      },
+      async ({ date, outcomes, commit_message }) => {
+        const result = await markEntriesDigested({
+          config: this.repoConfig(),
+          date,
+          outcomes,
+          commitMessage: commit_message,
+        });
+        const lines = [
+          result.commitSha
+            ? `Marked ${result.marked.length} entries digested `
+              + `(commit ${result.commitSha.slice(0, 7)}).`
+            : "Nothing marked.",
+        ];
+        if (result.alreadyDigested.length > 0) {
+          lines.push(
+            `${result.alreadyDigested.length} already carried a marker and `
+            + `were left alone: ${result.alreadyDigested.join(", ")}`,
+          );
+        }
+        if (result.unknown.length > 0) {
+          lines.push(
+            `${result.unknown.length} path(s) matched no entry: `
+            + `${result.unknown.join(", ")}`,
+          );
+        }
+        return { content: [{ type: "text" as const, text: lines.join("\n\n") }] };
       },
     );
 

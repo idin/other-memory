@@ -1,6 +1,6 @@
 {
   "name": "other-memory",
-  "version": "2.4.6",
+  "version": "2.5.0",
   "description": "MCP server giving Claude a long-term memory in a GitHub repo you own",
   "license": "MIT",
   "author": "Idin K",
