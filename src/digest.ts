@@ -18,6 +18,8 @@
 
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { MISTAKES_PREFIX } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
 import { DIGESTED_MARKER } from "./mistakes";
@@ -81,7 +83,7 @@ entry describing the recurrence reads like any other entry.
 export async function gatherDigestMaterial(
   config: MemoryRepoConfig,
 ): Promise<DigestMaterial> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
 
   const branch = await octokit.rest.repos.getBranch({
     owner: config.owner,

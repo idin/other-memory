@@ -1,5 +1,7 @@
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { decodeBase64, encodeBase64 } from "./base64";
 import {
   INSTRUCTIONS_PREFIX,
@@ -83,7 +85,7 @@ export async function readMemory(
   path: string,
 ): Promise<{ path: string; content: string; sha: string }> {
   assertReadable(path);
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
 
   const response = await octokit.rest.repos.getContent({
     owner: config.owner,
@@ -124,7 +126,7 @@ export async function appendMemory(
     throw new Error("Refusing to append empty text.");
   }
 
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const existing = await readMemory(config, path);
 
   const separator = existing.content.endsWith("\n") ? "" : "\n";

@@ -2,6 +2,8 @@ import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provid
 import { Hono } from "hono";
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import type { Env, UserProps } from "./types";
 
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
@@ -48,7 +50,7 @@ app.get("/callback", async (context) => {
   }
 
   const accessToken = await exchangeCodeForToken(context.env, code);
-  const octokit = new Octokit({ auth: accessToken });
+  const octokit = githubClient(accessToken);
   const user = await octokit.rest.users.getAuthenticated();
   const login = user.data.login;
 

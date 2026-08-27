@@ -15,6 +15,8 @@
 
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { NAMESPACE, isHiddenFromAgents } from "./layout";
 import { decodeBase64 } from "./base64";
 import type { MemoryRepoConfig } from "./memory_repo";
@@ -109,7 +111,7 @@ async function mapWithConcurrency<Item, Result>(
 export async function listStoreTree(
   config: MemoryRepoConfig,
 ): Promise<StoreBlobRef[]> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const branch = await octokit.rest.repos.getBranch({
     owner: config.owner,
     repo: config.repo,
@@ -156,7 +158,7 @@ export async function readStoreBlobs(
   config: MemoryRepoConfig,
   refs: StoreBlobRef[],
 ): Promise<StoreFileWithSha[]> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
 
   // Blobs are read by sha rather than paths by ref. One request per file
   // either way, but this cannot race a concurrent write: a sha names one

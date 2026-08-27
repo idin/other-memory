@@ -16,6 +16,8 @@
 
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { NAMESPACE } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
 
@@ -162,7 +164,7 @@ export async function planRebuild(
     return { mode: "up_to_date", changes: [], reason: null };
   }
 
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
 
   try {
     const comparison = await octokit.rest.repos.compareCommitsWithBasehead({
@@ -227,7 +229,7 @@ export async function planRebuild(
 export async function readHeadCommit(
   config: MemoryRepoConfig,
 ): Promise<string> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const branch = await octokit.rest.repos.getBranch({
     owner: config.owner,
     repo: config.repo,

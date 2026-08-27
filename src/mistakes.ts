@@ -13,6 +13,8 @@
 
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { MISTAKES_PREFIX } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
 
@@ -51,7 +53,7 @@ export type MistakeSummary = {
 export async function summariseMistakes(
   config: MemoryRepoConfig,
 ): Promise<MistakeSummary> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
 
   let entries: string[];
   try {

@@ -1,5 +1,7 @@
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { decodeBase64, encodeBase64 } from "./base64";
 import {
   ALLOWED_EXTENSIONS,
@@ -57,7 +59,7 @@ export type MemoryFileEntry = {
 export async function listMemoryFiles(
   config: MemoryRepoConfig,
 ): Promise<MemoryFileEntry[]> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const branch = await octokit.rest.repos.getBranch({
     owner: config.owner,
     repo: config.repo,
@@ -94,7 +96,7 @@ export async function createMemoryFile(
 ): Promise<{ path: string; commitSha: string }> {
   assertManagedPath(path);
 
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
 
   if (await pathExists(octokit, config, path)) {
     throw new Error(
@@ -131,7 +133,7 @@ export async function moveMemoryFile(
     throw new Error("Source and destination are the same path.");
   }
 
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   if (await pathExists(octokit, config, toPath)) {
     throw new Error(`${toPath} already exists; refusing to overwrite it.`);
   }
@@ -152,7 +154,7 @@ export async function deleteMemoryFile(
 ): Promise<{ path: string; commitSha: string; bytesRemoved: number }> {
   assertManagedPath(path);
 
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const existing = await octokit.rest.repos.getContent({
     owner: config.owner,
     repo: config.repo,

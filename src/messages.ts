@@ -1,5 +1,7 @@
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { assertFilenameFits } from "./filename_limit";
 
 import { agentDirectoryName, matchAgentName } from "./agent_names";
@@ -131,7 +133,7 @@ export async function sendMessage(
     + "---\n\n"
     + `${options.body.trim()}\n`;
 
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const commitSha = await commitTreeChanges(
     octokit,
     config,
@@ -191,7 +193,7 @@ export async function readMessage(
   path: string,
 ): Promise<{ path: string; content: string }> {
   assertMessagePath(path);
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const response = await octokit.rest.repos.getContent({
     owner: config.owner,
     repo: config.repo,
@@ -220,7 +222,7 @@ export async function archiveMessage(
   const destination = `${ARCHIVE_PREFIX}${path.slice(INBOX_PREFIX.length)}`;
   const existing = await readMessage(config, path);
 
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const commitSha = await commitTreeChanges(
     octokit,
     config,
@@ -266,7 +268,7 @@ function restoreIso(fileSafe: string): string {
 }
 
 async function inboxPaths(config: MemoryRepoConfig): Promise<string[]> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   const branch = await octokit.rest.repos.getBranch({
     owner: config.owner,
     repo: config.repo,

@@ -16,6 +16,8 @@
 
 import { Octokit } from "octokit";
 
+import { githubClient } from "./github_client";
+
 import { normalizeAgentName } from "./agent_names";
 import { HIDDEN_FROM_AGENTS_PREFIX } from "./layout";
 import type { MemoryRepoConfig } from "./memory_repo";
@@ -59,7 +61,7 @@ export function unwrapAgentToken(wrapped: string): string | null {
 async function readRecordedTokens(
   config: MemoryRepoConfig,
 ): Promise<Map<string, string>> {
-  const octokit = new Octokit({ auth: config.token });
+  const octokit = githubClient(config.token);
   let content: string;
   try {
     const response = await octokit.rest.repos.getContent({
