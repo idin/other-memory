@@ -143,15 +143,23 @@ export const MINIMUM_FUZZY_TOKEN_LENGTH = 4;
  * How many files to index per search.
  *
  * A Worker may make a bounded number of outbound calls per invocation — 50 on
- * the free plan — and every service call counts, including the database and
- * the embedding model. Indexing one file costs a read and a write, so a full
- * build of this store ran to roughly 220 calls and failed outright.
+ * the free plan — and every service call counts: GitHub, the embedding model,
+ * and the D1 database.
  *
- * Building in bounded batches fits any plan and does not assume a store size:
- * a fixed ceiling is exceeded by a large enough store whatever the plan, and
- * the failure is a search that cannot run at all.
+ * Per file, a rebuild round spends three subrequests: one GitHub blob read,
+ * one embedding call, one D1 `replaceFile`. The round also has a fixed
+ * overhead of roughly a dozen — the head commit, the built-commit lookup, the
+ * rebuild-plan comparison, the tree listing, and the index loads before and
+ * after. So the ceiling is `12 + 3n <= 50`, i.e. `n <= 12`, and 12 was
+ * originally set right at that edge.
+ *
+ * It failed there on 2026-09-10: a post-commit reconcile ran a full round of
+ * 12 and crossed the limit — the fixed overhead had crept up and the embed
+ * call per file was not counted in the original estimate. 8 leaves real
+ * headroom (`12 + 24 = 36`) and a slightly larger store still finishes across
+ * a few more rounds, which the alarm drives automatically.
  */
-export const FILES_INDEXED_PER_SEARCH = 12;
+export const FILES_INDEXED_PER_SEARCH = 8;
 
 /**
  * How long to wait before an alarm continues an incomplete index build.

@@ -82,3 +82,16 @@ Full suite green: 593 worker + repository, 41 integration.
 ## Status
 
 Fixed, tests green. Pending: publish + deploy.
+
+## Follow-up (2026-09-10, same day): memoization alone was not enough
+
+After deploying 2.5.2, `search_memory` and `continueIndexBuild` still failed
+with the subrequest error. `ensureTables` was ~12 wasted subrequests, but the
+round's real cost per file is three (blob read, embed call, D1 `replaceFile`),
+not the "read and write" the `FILES_INDEXED_PER_SEARCH` doc assumed — and the
+embed call had never been counted. At 12 files that is 36, plus ~13 fixed
+overhead, still over 50.
+
+`FILES_INDEXED_PER_SEARCH` lowered from 12 to 8 (`12 + 3*8 = 36`, real
+headroom). The doc comment now derives the ceiling explicitly so the next
+person can recompute it. Shipped in the same patch line.
