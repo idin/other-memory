@@ -322,6 +322,36 @@ describe("the token ceiling is never exceeded", () => {
       true,
     );
   });
+
+  test("a long block before the first H2 is chunked, not made the preamble", () => {
+    // gmail_filters.md, 2026-09-08: ~104 lines of numbered list with no blank
+    // lines and no sub-heading, then one `## Notable issues` section. The
+    // whole list was classified as the file preamble and prepended to every
+    // chunk, so all three chunks landed near 2530 tokens and the model
+    // rejected them — which failed the entire search, for every query.
+    const list = Array.from(
+      { length: 120 },
+      (_unused, index) =>
+        `${index + 1}. \`from:(sender${index}@example.com)\` -> Apply label "L${index}"`,
+    ).join("\n");
+    const chunks = chunkFile(
+      file(
+        "other-memory/infrastructure/email/filters.md",
+        `# Filters\n\nCaptured 2026-09-03.\n\n${list}\n\n## Notable issues\n\n- One point about the list above.`,
+      ),
+    );
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(estimateTokens(chunkSearchText(chunk))).toBeLessThanOrEqual(512);
+    }
+    // The list content is still there, just spread across chunks.
+    expect(chunks.some((chunk) => chunk.text.includes("sender0@example.com"))).toBe(
+      true,
+    );
+    expect(chunks.some((chunk) => chunk.text.includes("sender119@example.com"))).toBe(
+      true,
+    );
+  });
 });
 
 describe("chunk identity", () => {

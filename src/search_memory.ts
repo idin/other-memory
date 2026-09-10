@@ -15,7 +15,12 @@
  * never returned. Selection is a per-method cascade — see search_cascade.ts.
  */
 
-import { chunkFile, chunkSearchText, type MemoryChunk } from "./chunking";
+import {
+  EMBEDDING_MODEL_TOKEN_LIMIT,
+  chunkFile,
+  chunkSearchText,
+  type MemoryChunk,
+} from "./chunking";
 import {
   EMBEDDING_MODEL,
   EMBEDDING_POOLING,
@@ -68,6 +73,20 @@ export const DEFAULT_INCLUDE_DEEP = false;
  * complete one.
  */
 export const PARTIAL_INDEX_PREFIX = "PARTIAL INDEX: ";
+
+/**
+ * Marks an index reason that means "the index is built, but one or more
+ * chunks could not be embedded and are searchable by wording only".
+ *
+ * Deliberately not `PARTIAL_INDEX_PREFIX`: an oversized chunk is not
+ * unfinished work. Retrying embeds it again and it fails again — the fix is in
+ * the chunker, not another pass. So `buildProgress` must treat a build
+ * carrying only this note as complete, or the alarm reschedules itself
+ * forever, re-embedding the same doomed chunk every time. It is still a
+ * caveat on the results, so callers that flag partial responses check for it
+ * too.
+ */
+export const DEGRADED_INDEX_PREFIX = "DEGRADED INDEX: ";
 
 /**
  * List the store, then fetch text for only a bounded slice of it.
@@ -198,9 +217,14 @@ async function currentChunks(
       limit: FILES_INDEXED_PER_SEARCH,
     });
 
+    const oversizedThisRound: string[] = [];
     for (const file of batch) {
       const chunks = chunkFile(file);
-      const { embedded, unavailable } = await embedChunksOrExplain(chunks, embed);
+      const { embedded, unavailable, oversized } = await embedChunksOrExplain(
+        chunks,
+        embed,
+      );
+      recordOversized(oversized, oversizedThisRound);
       if (unavailable) {
         // Store what was read without vectors and stop embedding for this
         // round. Continuing would spend a call per file to be refused each
@@ -226,13 +250,15 @@ async function currentChunks(
       return {
         indexed: await index.load(identity),
         mode: plan.mode,
-        reason:
+        reason: withOversizedNote(
           `${PARTIAL_INDEX_PREFIX}Indexed ${alreadyIndexed.size + batch.length} `
-          + `of ${alreadyIndexed.size + totalEligible} files so far. A `
-          + `Worker can only make so many calls per request, so the index `
-          + `is built across several searches — an alarm continues it `
-          + `automatically, or search again to continue — `
-          + `${stillMissing} file(s) to go.`,
+            + `of ${alreadyIndexed.size + totalEligible} files so far. A `
+            + `Worker can only make so many calls per request, so the index `
+            + `is built across several searches — an alarm continues it `
+            + `automatically, or search again to continue — `
+            + `${stillMissing} file(s) to go.`,
+          oversizedThisRound,
+        ),
       };
     }
 
@@ -244,8 +270,10 @@ async function currentChunks(
     return {
       indexed: await index.load(identity),
       mode: plan.mode,
-      reason:
+      reason: withOversizedNote(
         `Index complete: ${alreadyIndexed.size + batch.length} files.`,
+        oversizedThisRound,
+      ),
     };
   }
 
@@ -285,6 +313,7 @@ async function currentChunks(
   const byPath = new Map(
     (await readStoreBlobs(config, refs)).map((file) => [file.path, file]),
   );
+  const oversizedThisRound: string[] = [];
   for (const change of changesThisRound) {
     if (change.kind === "delete") {
       await index.removeFile(identity, change.path);
@@ -295,7 +324,11 @@ async function currentChunks(
       continue;
     }
     const chunks = chunkFile(file);
-    const { embedded, unavailable } = await embedChunksOrExplain(chunks, embed);
+    const { embedded, unavailable, oversized } = await embedChunksOrExplain(
+      chunks,
+      embed,
+    );
+    recordOversized(oversized, oversizedThisRound);
     await index.replaceFile(identity, change.path, embedded);
     if (unavailable) {
       // Same reasoning as the full build: stop asking an embedder that is
@@ -315,16 +348,82 @@ async function currentChunks(
     return {
       indexed: await index.load(identity),
       mode: plan.mode,
-      reason:
+      reason: withOversizedNote(
         `${PARTIAL_INDEX_PREFIX}${unprocessed} changed file(s) still to `
-        + "index. An alarm continues it automatically, or search again to "
-        + "continue.",
+          + "index. An alarm continues it automatically, or search again to "
+          + "continue.",
+        oversizedThisRound,
+      ),
     };
   }
 
   await index.recordBuiltCommit(identity);
   await index.discardOtherCommits(identity);
-  return { indexed: await index.load(identity), mode: plan.mode, reason: null };
+  return {
+    indexed: await index.load(identity),
+    mode: plan.mode,
+    reason: withOversizedNote(null, oversizedThisRound),
+  };
+}
+
+/**
+ * Note oversized chunks, in the store's records and in this round's tally.
+ *
+ * A chunk that cannot be embedded stays lexically searchable — the search is
+ * poorer for the missing vector but not broken. The failure is worth
+ * surfacing, though: it means the chunker produced something over the model's
+ * limit, which is a bug in the chunker, not in the store's content. Logged to
+ * the console because Workers observability captures that, and folded into the
+ * search's own `reason` so a caller sees it without going to the logs.
+ *
+ * @param oversized - What `embedChunks` could not embed this file.
+ * @param tally - The round's running list of `path#ordinal` strings.
+ * @returns Nothing.
+ */
+function recordOversized(
+  oversized: { path: string; ordinal: number; estimatedTokens: number }[],
+  tally: string[],
+): void {
+  for (const one of oversized) {
+    console.warn(
+      JSON.stringify({
+        kind: "oversized_chunk",
+        path: one.path,
+        ordinal: one.ordinal,
+        estimatedTokens: one.estimatedTokens,
+        limit: EMBEDDING_MODEL_TOKEN_LIMIT,
+      }),
+    );
+    tally.push(`${one.path}#${one.ordinal} (~${one.estimatedTokens} tokens)`);
+  }
+}
+
+/**
+ * Add a note about un-embeddable chunks to a build reason, if there were any.
+ *
+ * @param reason - The reason so far, or null for a clean build.
+ * @param oversized - This round's `path#ordinal` strings.
+ * @returns The reason with a trailing note, or the reason unchanged.
+ */
+function withOversizedNote(
+  reason: string | null,
+  oversized: string[],
+): string | null {
+  if (oversized.length === 0) {
+    return reason;
+  }
+  const note =
+    `${DEGRADED_INDEX_PREFIX}${oversized.length} chunk(s) were too long to `
+    + `embed and are searchable by wording only: ${oversized.join("; ")}. `
+    + "This is a chunker bug — the file needs splitting.";
+  // Only ever appended to a non-partial reason. A partial build carries its
+  // own PARTIAL prefix and will run again anyway; folding the degraded note
+  // into that would be double-flagged and would not survive the next round.
+  return reason && reason.startsWith(PARTIAL_INDEX_PREFIX)
+    ? reason
+    : reason
+      ? `${reason} ${note}`
+      : note;
 }
 
 /**

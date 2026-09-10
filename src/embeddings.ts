@@ -316,18 +316,62 @@ export function searchSemantically(
  * @param embed - The embedder.
  * @returns The same chunks, each with its vector.
  */
+/**
+ * A chunk that could not be embedded because its text exceeds the model's
+ * limit, with the estimate that disqualified it.
+ */
+export type OversizedChunk = {
+  path: string;
+  ordinal: number;
+  estimatedTokens: number;
+};
+
 export async function embedChunks(
   chunks: MemoryChunk[],
   embed: Embedder,
-): Promise<{ chunk: MemoryChunk; vector: Float32Array }[]> {
+): Promise<{
+  embedded: { chunk: MemoryChunk; vector: Float32Array | null }[];
+  oversized: OversizedChunk[];
+}> {
   if (chunks.length === 0) {
-    return [];
+    return { embedded: [], oversized: [] };
   }
+
+  // The chunker is meant to guarantee every chunk fits, and when it does this
+  // partition is a no-op. It exists because a single chunk that slips past —
+  // a preamble bug, an estimate that ran short — used to throw for the whole
+  // batch, which failed the file, which aborted the build, which took down
+  // every search on every query (2026-09-08). An oversized chunk is skipped
+  // and reported; it stays lexically searchable, just with no vector.
+  const oversized: OversizedChunk[] = [];
+  const safeTexts: string[] = [];
+  const safeIndex: number[] = [];
+  chunks.forEach((chunk, index) => {
+    const text = chunkSearchText(chunk);
+    if (estimateTokens(text) > EMBEDDING_MODEL_TOKEN_LIMIT) {
+      oversized.push({
+        path: chunk.path,
+        ordinal: chunk.ordinal,
+        estimatedTokens: estimateTokens(text),
+      });
+      return;
+    }
+    safeTexts.push(text);
+    safeIndex.push(index);
+  });
+
   // Embedded with heading ancestry and preamble included, so the vector
   // carries the context the chunk sits in — a section under "Imported
   // (second-hand)" should be findable by that phrase.
-  const vectors = await embed(chunks.map((chunk) => chunkSearchText(chunk)));
-  return chunks.map((chunk, index) => ({ chunk, vector: vectors[index] }));
+  const vectors = safeTexts.length > 0 ? await embed(safeTexts) : [];
+
+  const embedded: { chunk: MemoryChunk; vector: Float32Array | null }[] =
+    chunks.map((chunk) => ({ chunk, vector: null }));
+  safeIndex.forEach((originalIndex, safePosition) => {
+    embedded[originalIndex].vector = vectors[safePosition];
+  });
+
+  return { embedded, oversized };
 }
 
 /**
@@ -385,15 +429,18 @@ export async function embedChunksOrExplain(
 ): Promise<{
   embedded: { chunk: MemoryChunk; vector: Float32Array | null }[];
   unavailable: string | null;
+  oversized: OversizedChunk[];
 }> {
   if (!embed) {
     return {
       embedded: chunks.map((chunk) => ({ chunk, vector: null })),
       unavailable: null,
+      oversized: [],
     };
   }
   try {
-    return { embedded: await embedChunks(chunks, embed), unavailable: null };
+    const { embedded, oversized } = await embedChunks(chunks, embed);
+    return { embedded, unavailable: null, oversized };
   } catch (error) {
     if (!isEmbedderUnavailable(error)) {
       throw error;
@@ -401,6 +448,7 @@ export async function embedChunksOrExplain(
     return {
       embedded: chunks.map((chunk) => ({ chunk, vector: null })),
       unavailable: error instanceof Error ? error.message : String(error),
+      oversized: [],
     };
   }
 }

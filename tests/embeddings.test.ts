@@ -232,9 +232,13 @@ describe("searchSemantically", () => {
 describe("embedChunks", () => {
   test("every chunk gets a vector", async () => {
     const chunks = [chunk({ ordinal: 0 }), chunk({ ordinal: 1 })];
-    const embedded = await embedChunks(chunks, workersAiEmbedder(fakeAi(), NO_USAGE));
+    const { embedded, oversized } = await embedChunks(
+      chunks,
+      workersAiEmbedder(fakeAi(), NO_USAGE),
+    );
     expect(embedded).toHaveLength(2);
     expect(embedded[0].vector).toHaveLength(EMBEDDING_DIMENSIONS);
+    expect(oversized).toEqual([]);
   });
 
   test("heading ancestry is embedded with the chunk", async () => {
@@ -246,6 +250,39 @@ describe("embedChunks", () => {
       workersAiEmbedder(ai, NO_USAGE),
     );
     expect(ai.calls[0].text[0]).toContain("second-hand");
+  });
+
+  test("an oversized chunk is skipped, not fatal, and reported", async () => {
+    // The 2026-09-08 outage: one chunk over the model's limit threw for the
+    // whole batch, which failed the file, which aborted the build, which took
+    // down every search. Now it comes back with a null vector and a report,
+    // and its file-mates still get embedded.
+    const ai = fakeAi();
+    const huge = chunk({ ordinal: 0, text: "word ".repeat(4000) });
+    const fine = chunk({ ordinal: 1, text: "a short fact" });
+    const { embedded, oversized } = await embedChunks(
+      [huge, fine],
+      workersAiEmbedder(ai, NO_USAGE),
+    );
+    expect(embedded).toHaveLength(2);
+    expect(embedded[0].vector).toBeNull();
+    expect(embedded[1].vector).toHaveLength(EMBEDDING_DIMENSIONS);
+    expect(oversized).toHaveLength(1);
+    expect(oversized[0].ordinal).toBe(0);
+    expect(oversized[0].estimatedTokens).toBeGreaterThan(512);
+    // The safe chunk was still sent — one bad chunk did not stop the batch.
+    expect(ai.calls[0].text).toHaveLength(1);
+  });
+
+  test("a batch of only oversized chunks makes no embedding call", async () => {
+    const ai = fakeAi();
+    const { embedded, oversized } = await embedChunks(
+      [chunk({ ordinal: 0, text: "word ".repeat(4000) })],
+      workersAiEmbedder(ai, NO_USAGE),
+    );
+    expect(embedded[0].vector).toBeNull();
+    expect(oversized).toHaveLength(1);
+    expect(ai.calls).toEqual([]);
   });
 });
 

@@ -57,6 +57,24 @@ const CHARACTERS_PER_TOKEN_ESTIMATE = 4;
 const CHUNK_TARGET_TOKENS = 320;
 
 /**
+ * The largest the file preamble may be, in estimated tokens.
+ *
+ * The preamble is prepended to every chunk's embedded text, so its cost is
+ * paid once per chunk. A scope note — "these figures are second-hand", "as of
+ * September 2026" — is a sentence or two and fits easily. But nothing stops a
+ * file putting a hundred lines of content before its first `##`, and when it
+ * does, `splitMarkdown` was classifying the whole block as preamble and
+ * welding it onto every chunk. `gmail_filters.md` did exactly this on
+ * 2026-09-08 and every chunk blew past the model's limit, which failed the
+ * entire search.
+ *
+ * Half the chunk target: a preamble larger than the body it qualifies has
+ * stopped being a qualifier. Content beyond this is emitted as its own chunk
+ * under the H1 instead, and chunked like any other section.
+ */
+const MAXIMUM_PREAMBLE_TOKENS = CHUNK_TARGET_TOKENS / 2;
+
+/**
  * The line count below which a file with no internal sections is one chunk.
  *
  * Two conditions, not one. Length alone is the wrong test: a thirty-line file
@@ -233,9 +251,38 @@ function splitMarkdown(text: string): {
       return;
     }
     // Everything before the first H2 is the file's own scope note, which the
-    // store's convention puts there to qualify every fact below it.
+    // store's convention puts there to qualify every fact below it — but only
+    // up to a point. A block larger than MAXIMUM_PREAMBLE_TOKENS is content,
+    // not a qualifier, and welding it onto every chunk is what failed the
+    // whole search on 2026-09-08. Keep the leading scope note as preamble and
+    // emit the overflow as an ordinary chunk under the H1.
     if (bufferHeadings.length <= 1 && !seenHeading) {
-      preamble = body;
+      if (estimateTokens(body) <= MAXIMUM_PREAMBLE_TOKENS) {
+        preamble = body;
+        return;
+      }
+      const paragraphs = body.split(/\n{2,}/);
+      const kept: string[] = [];
+      let rest = paragraphs;
+      for (let i = 0; i < paragraphs.length; i += 1) {
+        const candidate = [...kept, paragraphs[i]].join("\n\n");
+        if (kept.length > 0 && estimateTokens(candidate) > MAXIMUM_PREAMBLE_TOKENS) {
+          rest = paragraphs.slice(i);
+          break;
+        }
+        kept.push(paragraphs[i]);
+        rest = paragraphs.slice(i + 1);
+      }
+      preamble = kept.join("\n\n").trim();
+      const overflow = rest.join("\n\n").trim();
+      if (overflow.length > 0) {
+        chunks.push({
+          text: overflow,
+          headingPath: [...bufferHeadings],
+          startLine: bufferStart,
+        });
+      }
+      bufferStart = endExclusive;
       return;
     }
     chunks.push({

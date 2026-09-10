@@ -61,6 +61,7 @@ import {
 import type { Embedder } from "./embeddings";
 import {
   DEFAULT_INCLUDE_DEEP,
+  DEGRADED_INDEX_PREFIX,
   PARTIAL_INDEX_PREFIX,
   advanceIndexBuild,
   noOpRawSearchSink,
@@ -432,12 +433,14 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
           Date.now(),
         );
 
-        // Only a reason that says the index is incomplete goes to the
-        // reader as a caveat about these results. "Index complete: N files."
-        // is also non-null but is informational, not a warning — surfaced
-        // separately below, not folded into indexReason, so it never reads
-        // as though these results might be missing something.
-        const isPartial = outcome.indexReason?.startsWith(PARTIAL_INDEX_PREFIX)
+        // Only a reason that says the index is incomplete or degraded goes to
+        // the reader as a caveat about these results. "Index complete: N
+        // files." is also non-null but is informational, not a warning —
+        // surfaced separately below, not folded into indexReason, so it never
+        // reads as though these results might be missing something.
+        const isPartial =
+          (outcome.indexReason?.startsWith(PARTIAL_INDEX_PREFIX)
+            || outcome.indexReason?.startsWith(DEGRADED_INDEX_PREFIX))
           ?? false;
 
         const described = describeSearchResults(outcome.results, {

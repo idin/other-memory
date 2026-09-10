@@ -111,11 +111,31 @@ export function d1MemoryIndex(
   database: D1Database,
   options: { now: () => number },
 ): MemoryIndex {
-  async function ensureTables(): Promise<void> {
-    await database.batch([
-      database.prepare(CREATE_CHUNK_TABLE),
-      database.prepare(CREATE_STATE_TABLE),
-    ]);
+  // Memoized: the DDL is idempotent, but a Worker has a hard ceiling on
+  // subrequests per invocation and every index method called it afresh — a
+  // full-rebuild round (one load, twelve replaceFile, the built-commit
+  // bookkeeping) spent roughly a dozen subrequests re-creating tables that
+  // already existed, which pushed the round past the limit and left search
+  // and the alarm both failing on every call (2026-09-10). Run once per
+  // instance; a Durable Object reuses the instance across calls, so this
+  // holds for the object's lifetime.
+  let tablesReady: Promise<void> | null = null;
+  function ensureTables(): Promise<void> {
+    if (!tablesReady) {
+      tablesReady = database
+        .batch([
+          database.prepare(CREATE_CHUNK_TABLE),
+          database.prepare(CREATE_STATE_TABLE),
+        ])
+        .then(() => undefined)
+        .catch((error: unknown) => {
+          // A failed create must not be cached as done — the next call has to
+          // be able to try again.
+          tablesReady = null;
+          throw error;
+        });
+    }
+    return tablesReady;
   }
 
   return {
