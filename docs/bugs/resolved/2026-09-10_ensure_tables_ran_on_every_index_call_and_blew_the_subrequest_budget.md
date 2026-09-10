@@ -95,3 +95,33 @@ overhead, still over 50.
 `FILES_INDEXED_PER_SEARCH` lowered from 12 to 8 (`12 + 3*8 = 36`, real
 headroom). The doc comment now derives the ceiling explicitly so the next
 person can recompute it. Shipped in the same patch line.
+
+## Third fault, same session: the incremental build never finished
+
+After 2.5.3, search stopped failing — but the "N changed file(s) still to
+index" count stood still across search after search. The incremental rebuild
+path (`currentChunks`, the `builtSha` branch) always did
+`plan.changes.slice(0, FILES_INDEXED_PER_SEARCH)` — the *first* N changes —
+and returned `PARTIAL INDEX` without recording progress. `builtCommit` only
+advances when a build fully completes, which cannot happen when the change
+set is larger than one batch, so every subsequent search recomputed the same
+plan and reprocessed the same first N changes. Files past the first batch
+were never reached. (The *full* rebuild path did not have this: it excludes
+`alreadyIndexed` each round, so it advances.)
+
+Exposed by making 26 commits to `keep` in one day, then deleting a file — the
+delete's reconcile put 26 changes into one incremental plan.
+
+Fix: after `carryForward`, load the rows already at the target commit and
+filter the plan to changes not yet reflected there — an upsert whose rows are
+absent, or a delete whose rows are still present. `unprocessed` is now
+`remainingChanges.length - changesThisRound.length`.
+
+Test: `tests/integration/search_memory.integration.test.ts` "an incremental
+build with more changes than one batch still finishes" — completes a build,
+changes `FILES_INDEXED_PER_SEARCH + 3` files, then drives `advanceIndexBuild`
+to completion and asserts the "still to index" count strictly decreases and
+`builtCommit` reaches head. Verified to hang (never `complete`) without the
+fix.
+
+Shipped in 2.5.4.

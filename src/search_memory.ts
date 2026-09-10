@@ -298,10 +298,31 @@ async function currentChunks(
     });
   }
 
+  // When more files changed than one round can process, this path runs again
+  // on the next search with the same plan — `builtCommit` does not advance
+  // until every change is in. Without skipping what earlier rounds already
+  // did, it would reprocess the same first `FILES_INDEXED_PER_SEARCH` changes
+  // forever and never reach the rest.
+  //
+  // A change is still outstanding when the target commit does not yet reflect
+  // it. For an upsert that means its rows are not present; for a delete it
+  // means its rows are still present (a delete removes them, and
+  // `carryForward` never copied them because the path was excluded). So the
+  // same "is this path in the current rows?" check settles both, in opposite
+  // directions.
+  const rowsAtTarget = new Set(
+    (await index.load(identity)).map((entry) => entry.chunk.path),
+  );
+  const remainingChanges = plan.changes.filter((change) =>
+    change.kind === "delete"
+      ? rowsAtTarget.has(change.path)
+      : !rowsAtTarget.has(change.path),
+  );
+
   // Only the changed files scheduled this round need their text — an
   // unbounded fetch here would cost a subrequest per changed file regardless
   // of how many `FILES_INDEXED_PER_SEARCH` allows this call to use.
-  const changesThisRound = plan.changes.slice(0, FILES_INDEXED_PER_SEARCH);
+  const changesThisRound = remainingChanges.slice(0, FILES_INDEXED_PER_SEARCH);
   const upsertPaths = new Set(
     changesThisRound
       .filter((change) => change.kind === "upsert")
@@ -343,7 +364,7 @@ async function currentChunks(
     }
   }
 
-  const unprocessed = plan.changes.length - FILES_INDEXED_PER_SEARCH;
+  const unprocessed = remainingChanges.length - changesThisRound.length;
   if (unprocessed > 0) {
     return {
       indexed: await index.load(identity),

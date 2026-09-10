@@ -372,4 +372,83 @@ describe("resuming a build across several calls", () => {
     });
     expect(built).toBe(finalHead);
   });
+
+  test("an incremental build with more changes than one batch still finishes", async () => {
+    // The 2026-09-10 stall: the incremental path always sliced the first
+    // FILES_INDEXED_PER_SEARCH changes and never recorded progress, so once
+    // more files changed than a batch holds it reprocessed the same first
+    // few every call and the rest were never reached — the "N still to
+    // index" count never moved.
+    const index = inProcessMemoryIndex();
+    const embed = null;
+    const model = "@cf/baai/bge-base-en-v1.5";
+    const identity = { model, pooling: "cls" } as const;
+
+    // First: a complete build at the current commit, so there is a builtSha
+    // for the next changes to be incremental against.
+    let outcome = await advanceIndexBuild(config, index, embed);
+    let guard = 0;
+    while (!outcome.complete && guard < 30) {
+      outcome = await advanceIndexBuild(config, index, embed);
+      guard += 1;
+    }
+    expect(outcome.complete).toBe(true);
+    const baseBuilt = await index.builtCommit(identity);
+    expect(baseBuilt).toBe(await readHeadCommit(config));
+
+    // Now change more files than one batch can hold.
+    const changed = FILES_INDEXED_PER_SEARCH + 3;
+    for (let i = 0; i < changed; i += 1) {
+      await createMemoryFile(
+        config,
+        `other-memory/facts/incremental_check_${i}.md`,
+        `# Incremental check ${i}\n\nOne of ${changed} files changed after a `
+          + "complete build, to force a multi-round incremental rebuild.\n",
+        `test: incremental file ${i} of ${changed}`,
+      );
+    }
+    await eventually(async () => {
+      const plan = await planRebuild(
+        config,
+        await index.builtCommit(identity),
+        await readHeadCommit(config),
+        null,
+      );
+      expect(plan.mode).toBe("incremental");
+      expect(plan.changes.length).toBeGreaterThan(FILES_INDEXED_PER_SEARCH);
+    });
+
+    // Drive the incremental build to completion — nothing but advanceIndexBuild.
+    outcome = await advanceIndexBuild(config, index, embed);
+    expect(outcome.complete).toBe(false);
+    guard = 0;
+    const seenRemaining: number[] = [];
+    while (!outcome.complete && guard < 30) {
+      const match = outcome.reason?.match(/(\d+) changed file\(s\) still to/);
+      if (match) {
+        seenRemaining.push(Number(match[1]));
+      }
+      outcome = await advanceIndexBuild(config, index, embed);
+      guard += 1;
+    }
+
+    expect(outcome.complete).toBe(true);
+    expect(await index.builtCommit(identity)).toBe(await readHeadCommit(config));
+    // The "still to index" count must strictly decrease — the bug was it
+    // standing still.
+    expect(seenRemaining.length).toBeGreaterThan(0);
+    for (let i = 1; i < seenRemaining.length; i += 1) {
+      expect(seenRemaining[i]).toBeLessThan(seenRemaining[i - 1]);
+    }
+
+    // Every changed file is now in the index at the head commit.
+    const head = await readHeadCommit(config);
+    const finalRows = await index.load({ commitSha: head, ...identity });
+    const finalPaths = new Set(finalRows.map((entry) => entry.chunk.path));
+    for (let i = 0; i < changed; i += 1) {
+      expect(finalPaths.has(`other-memory/facts/incremental_check_${i}.md`)).toBe(
+        true,
+      );
+    }
+  });
 });
