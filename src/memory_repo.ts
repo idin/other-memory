@@ -4,6 +4,7 @@ import { githubClient } from "./github_client";
 
 import { decodeBase64, encodeBase64 } from "./base64";
 import {
+  ALLOWED_EXTENSIONS,
   INSTRUCTIONS_PREFIX,
   NAMESPACE,
   assertWellFormed,
@@ -108,11 +109,24 @@ export async function readMemory(
 
 /**
  * Append text to the end of a memory file and commit directly to the branch.
+ * Creates the file first if it does not exist yet.
  *
  * Appends rather than replaces: this server has no tool that can delete or
  * rewrite existing content, so a compromised or confused caller cannot erase
  * history. Corrections are made by appending a superseding entry, per the
  * repo's "superseded, not deleted" rule.
+ *
+ * Auto-creating on a missing path, rather than erroring and pointing the
+ * caller at `create_memory_file`, closes a mistake this way of splitting the
+ * two tools invited: an agent recording something new has no way to know in
+ * advance whether the target file already exists, and guessing wrong used to
+ * fail with a bare GitHub 404 — "Not Found -
+ * .../rest/repos/contents#get-repository-content" — that named neither the
+ * cause nor the fix. Two attempts in a row failed that way on 2026-09-11 and
+ * the write was lost both times. "Append this fact" has one obviously correct
+ * behaviour regardless of whether the file happens to exist yet, so the tool
+ * now provides it directly instead of asking the caller to know the answer
+ * first.
  */
 export async function appendMemory(
   config: MemoryRepoConfig,
@@ -122,14 +136,32 @@ export async function appendMemory(
 ): Promise<{ path: string; commitSha: string; bytesAppended: number }> {
   assertAppendable(path);
 
+  if (path.endsWith("/")) {
+    throw new Error("Provide a file path, not a folder.");
+  }
+  if (!ALLOWED_EXTENSIONS.some((extension) => path.endsWith(extension))) {
+    throw new Error(
+      `Memory files must end in ${ALLOWED_EXTENSIONS.join(" or ")} — got: ${path}`,
+    );
+  }
   if (text.trim().length === 0) {
     throw new Error("Refusing to append empty text.");
   }
 
   const octokit = githubClient(config.token);
-  const existing = await readMemory(config, path);
 
-  const separator = existing.content.endsWith("\n") ? "" : "\n";
+  let existing: { content: string; sha: string | undefined };
+  try {
+    existing = await readMemory(config, path);
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      throw error;
+    }
+    existing = { content: "", sha: undefined };
+  }
+
+  const separator =
+    existing.content.length === 0 || existing.content.endsWith("\n") ? "" : "\n";
   const updated = `${existing.content}${separator}${text.trimEnd()}\n`;
 
   const response = await octokit.rest.repos.createOrUpdateFileContents({
@@ -138,7 +170,11 @@ export async function appendMemory(
     path,
     message: commitMessage,
     content: encodeBase64(updated),
-    sha: existing.sha,
+    // Omitted when the file is being created: GitHub's contents API treats a
+    // provided sha as "replace this exact blob" and rejects a create with
+    // one. Present when appending, so a concurrent edit is still caught
+    // rather than silently overwritten.
+    ...(existing.sha ? { sha: existing.sha } : {}),
     branch: config.branch,
   });
 
@@ -152,6 +188,11 @@ export async function appendMemory(
     commitSha,
     bytesAppended: text.trimEnd().length,
   };
+}
+
+/** Whether an error means GitHub could not find the requested file. */
+function isMissingFile(error: unknown): boolean {
+  return (error as { status?: number } | null)?.status === 404;
 }
 
 

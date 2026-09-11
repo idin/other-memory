@@ -86,6 +86,31 @@ describe("appending", () => {
     ).rejects.toThrow();
   });
 
+  test("appending to a path that does not exist yet creates it instead of failing", async () => {
+    // 2026-09-11: an agent called append_memory on a mistake-log path that
+    // had never been created, twice, and both attempts failed with GitHub's
+    // own opaque error — "Not Found -
+    // https://docs.github.com/rest/repos/contents#get-repository-content" —
+    // and the write was lost both times. "Append this fact" has one
+    // obviously correct behaviour whether or not the file already exists, so
+    // append_memory now provides it directly rather than requiring the
+    // caller to know in advance which tool to call.
+    const missing = `other-memory/facts/does_not_exist_${Date.now()}.md`;
+
+    const result = await appendMemory(
+      config,
+      missing,
+      "- Some fact.",
+      "test: create via append",
+    );
+    expect(result.path).toBe(missing);
+
+    await eventually(async () => {
+      const created = await readMemory(config, missing);
+      expect(created.content).toContain("Some fact.");
+    });
+  });
+
   test("a stale sha is rejected rather than clobbering the file", async () => {
     // Read once, then let somebody else write, then try to write using what
     // was read. This is the promise the sha exists to keep, and until now
