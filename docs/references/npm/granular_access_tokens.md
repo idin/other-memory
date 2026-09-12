@@ -3,6 +3,14 @@
 How npm's package-scoped tokens actually work, and the trap they set for a
 brand-new package name.
 
+> **Superseded 2026-09-12 by
+> [`publishing_a_new_package.md`](publishing_a_new_package.md).** Read that
+> first. This file's claim that `npm login` + `npm publish` fails with
+> `EOTP` on a passkey-only account was **never observed**, contradicts
+> npm's own 2FA documentation, and sent an agent down a wrong path for an
+> hour on 2026-09-12. The corrections are marked inline below. The scoping
+> and chicken-and-egg material here is still accurate.
+
 ## The scoping model
 
 `npm token create` (the CLI command) cannot create a granular, per-package
@@ -48,15 +56,30 @@ something wrong.
   browser-based publish path — it does not exist. (Confirmed by checking
   `docs.npmjs.com/cli/v10/commands/npm-publish`, which documents no such
   feature.)
-- 2FA-via-passkey-only accounts (no TOTP) cannot supply `--otp=<code>` to
+- ~~2FA-via-passkey-only accounts (no TOTP) cannot supply `--otp=<code>` to
   `npm publish` — `npm login` succeeds via passkey, but `npm publish` still
   demands a TOTP code the account cannot produce, and fails with `EOTP` even
-  after a successful login.
+  after a successful login.~~
 
-## The proven bootstrap method
+  **Struck 2026-09-12. Never observed, and probably false.** npm's own 2FA
+  documentation states: "security-key with WebAuthn can be used for
+  authentication from both the web and the command line, but it can only be
+  configured from the web." The only failure actually observed was
+  `403 Forbidden` from a *scope* mismatch (a token scoped to `other-memory`
+  publishing `musix-box`), which says nothing about OTP. `keep`'s mistake
+  log entry from this same day
+  (`2026-08-16_told_idin_to_publish_via_a_web_ui_that_does_not_exist.md`)
+  states the correct path is "`npm login` (passkey works interactively)
+  followed by `npm publish`". Resolve via the Open question in
+  `publishing_a_new_package.md` before relying on either version.
 
-This is the exact method that worked once already for `@ixmachina/memory`,
-and is the one to repeat — not a new design, a replay of a working recipe:
+## The bootstrap method
+
+**"Proven" was overstated — corrected 2026-09-12.** This worked once for
+`@ixmachina/memory`, which shows it is *sufficient*, not that it is
+*necessary*: nobody ever tested whether the simpler `npm login` path would
+also have worked. Treat this as the fallback described in
+`publishing_a_new_package.md` Procedure A2, not the default.
 
 1. On npmjs.com, while logged in: profile icon (top right) → **Access
    Tokens** → **Generate New Token** → **Granular Access Token**.
