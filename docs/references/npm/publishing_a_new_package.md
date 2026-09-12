@@ -77,7 +77,7 @@ about to declare impossible, check against the actor table first.
 | The granular-token picker cannot scope to a nonexistent package | Observed on npmjs.com | 2026-08-16 | Confirmed |
 | There is no browser publish flow on npmjs.com | npm CLI docs | 2026-08-16 | Confirmed |
 | WebAuthn/passkey works for CLI auth, not just web | npm 2FA docs, quoted below | 2026-09-12 | Confirmed |
-| **`npm login` + `npm publish` fails `EOTP` on a passkey-only account** | **Never actually observed** | — | **UNVERIFIED — see below** |
+| `npm login` + `npm publish` **works** on a passkey-only account | Idin ran it; `musix-box@0.1.0` published | 2026-09-12 | **Confirmed — the EOTP claim was false** |
 
 ## The unverified claim that caused the problem
 
@@ -105,8 +105,17 @@ not perform that action with these credentials"** when publishing
 failure. It is not `EOTP`, and it says nothing about whether `EOTP` would
 occur under an interactive login.
 
-**Do not build a plan on the EOTP claim until someone runs the test in
-"Open question" below and records the result here.**
+**RESOLVED 2026-09-12.** Idin ran `npm login` then
+`npm publish --access public` in his own terminal for `musix-box`. It
+published successfully as `musix-box@0.1.0`, owned by `ixmachina`. **The
+`EOTP` claim was false.** A passkey-only account can complete a CLI
+publish after an interactive login, exactly as npm's own 2FA
+documentation says.
+
+Consequence: **the bootstrap-token path (Procedure A2) is not needed for a
+first publish.** It is retained only as a fallback if `npm login` is ever
+unavailable. No broad all-packages credential should be minted for an
+ordinary new package — ask Idin to run the two commands instead.
 
 ## Who does what — the three agents and the human
 
@@ -394,19 +403,38 @@ is worth a calendar reminder rather than rediscovering it at publish time.
 the procedures above (which pass `--userconfig` explicitly) but will make a
 bare `npm whoami` or `npm publish` look broken for the wrong reason.
 
-## Open question — resolve this and update the table above
+## Resolved 2026-09-12 — `npm login` works, no bootstrap token needed
 
-**Does `npm login` + `npm publish` work on this passkey-only account?**
+**Does `npm login` + `npm publish` work on this passkey-only account? Yes.**
 
-npm's own docs say WebAuthn works from the command line. The earlier claim
-that it fails `EOTP` was never observed and is contradicted by the mistake
-log. Until someone runs Procedure A1 in a real terminal and records what
-happens, the EOTP claim stays marked UNVERIFIED here.
+Idin ran, in his own terminal:
 
-Whoever runs it: record the exact outcome in the status table and in the
-prose above, including the verbatim error if it fails. If it succeeds,
-Procedure A2 should be demoted to a historical note, because no broad
-credential would ever be needed again.
+```sh
+cd /Users/idin/code/musix-box
+npm login                      # passkey
+npm publish --access public
+```
+
+Result: `musix-box@0.1.0` published, owner `ixmachina`. Confirmed
+independently with `check_package.sh npm musix-box`.
+
+This matches npm's own 2FA documentation ("security-key with WebAuthn can
+be used for authentication from both the web and the command line") and
+contradicts the `EOTP` claim that had been sitting unverified in
+`granular_access_tokens.md` since 2026-08-16.
+
+**What this changes:**
+
+- **Procedure A1 is the path for a first publish.** Two commands in Idin's
+  terminal. Nothing else.
+- **Procedure A2 (bootstrap token) is a fallback only**, for the case where
+  `npm login` itself is unavailable. Do not mint an all-packages
+  bypass-2FA credential for an ordinary new package — it was never
+  necessary, and an hour was spent on 2026-09-12 planning around a
+  requirement that did not exist.
+- The `@ixmachina/memory` first publish, which did use a bootstrap token,
+  shows that path is *sufficient*, not that it is *necessary*. Nobody had
+  tested the simpler one.
 
 ## What not to do — the actual mistakes, 2026-09-12
 

@@ -6,10 +6,11 @@ brand-new package name.
 > **Superseded 2026-09-12 by
 > [`publishing_a_new_package.md`](publishing_a_new_package.md).** Read that
 > first. This file's claim that `npm login` + `npm publish` fails with
-> `EOTP` on a passkey-only account was **never observed**, contradicts
-> npm's own 2FA documentation, and sent an agent down a wrong path for an
-> hour on 2026-09-12. The corrections are marked inline below. The scoping
-> and chicken-and-egg material here is still accurate.
+> `EOTP` on a passkey-only account is **disproven** — `musix-box@0.1.0`
+> published that way on 2026-09-12. It contradicted npm's own 2FA
+> documentation and sent an agent down a wrong path for an hour. The
+> corrections are marked inline below. The scoping and chicken-and-egg
+> material here is still accurate.
 
 ## The scoping model
 
@@ -61,7 +62,7 @@ something wrong.
   demands a TOTP code the account cannot produce, and fails with `EOTP` even
   after a successful login.~~
 
-  **Struck 2026-09-12. Never observed, and probably false.** npm's own 2FA
+  **Struck 2026-09-12. DISPROVEN — not merely unverified.** Idin ran `npm login` then `npm publish --access public` and `musix-box@0.1.0` published successfully on this passkey-only account. npm's own 2FA
   documentation states: "security-key with WebAuthn can be used for
   authentication from both the web and the command line, but it can only be
   configured from the web." The only failure actually observed was
@@ -70,8 +71,8 @@ something wrong.
   log entry from this same day
   (`2026-08-16_told_idin_to_publish_via_a_web_ui_that_does_not_exist.md`)
   states the correct path is "`npm login` (passkey works interactively)
-  followed by `npm publish`". Resolve via the Open question in
-  `publishing_a_new_package.md` before relying on either version.
+  followed by `npm publish`" — which is now the confirmed behaviour. See
+  `publishing_a_new_package.md` for the verified procedure.
 
 ## The bootstrap method
 
@@ -89,9 +90,11 @@ also have worked. Treat this as the fallback described in
    the same form. Click **Generate Token** and copy it immediately — it is
    shown once only. This is a one-time bootstrap token, used once.
 3. Use that token for the **first** `npm publish` of the new package name
-   (`npm publish --access public --//registry.npmjs.org/:_authToken=<token>`,
-   or set it in `.npmrc`). This is what actually avoids the `EOTP` error —
-   `bypass_2fa` is a property of the token, not of the login session.
+   (`npm publish --access public --userconfig <temp .npmrc>`). Note the
+   original rationale here — "this is what actually avoids the `EOTP`
+   error" — was wrong: there is no `EOTP` error to avoid. `bypass_2fa` is
+   indeed a token property, but an interactive `npm login` session does not
+   need it.
 4. Once the package exists on the registry, go back to npmjs.com and create
    a **second**, narrowly-scoped token — `bypass_2fa: true`, scoped only to
    the new package name — mirroring exactly how the old package's token was
