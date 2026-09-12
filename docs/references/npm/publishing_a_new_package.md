@@ -187,7 +187,7 @@ The registry exposes every token's own scope, permissions, expiry and
 
 ```sh
 set -a && source ~/code/.env && set +a
-curl -s -H "Authorization: Bearer ${NPM_TOKEN_IXMACHINA_CLAUDE_AGENT}" \
+curl -s -H "Authorization: Bearer ${NPM_TOKEN_IXMACHINA_OTHER_MEMORY_AGENT_WRITE_BYPASS_2FA}" \
   https://registry.npmjs.org/-/npm/v1/tokens | python3 -m json.tool
 ```
 
@@ -383,7 +383,7 @@ As of 2026-09-12, from the registry API:
 
 | Variable in `~/code/.env` | Scope | `bypass_2fa` | Expires |
 | --- | --- | --- | --- |
-| `NPM_TOKEN_IXMACHINA_CLAUDE_AGENT` | `other-memory` only | true | **2026-09-16** |
+| `NPM_TOKEN_IXMACHINA_OTHER_MEMORY_AGENT_WRITE_BYPASS_2FA` | `other-memory` only | true | **2026-09-16** |
 
 **That token expires in four days.** When it does, `other-memory` publishes
 break. Renewing needs the web UI and a passkey gesture — a human step.
