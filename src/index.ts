@@ -59,6 +59,7 @@ import {
   type MemoryIndex,
 } from "./memory_index";
 import type { Embedder } from "./embeddings";
+import { localiseTimestamps } from "./local_timestamps";
 import {
   DEFAULT_INCLUDE_DEEP,
   DEGRADED_INDEX_PREFIX,
@@ -253,7 +254,8 @@ export class MemoryMCP extends McpAgent<Env, unknown, UserProps> {
           args,
           login: this.props?.login ?? null,
           sink: this.failureSink,
-          run: async () => attachReminder(name, args, await handler(args)),
+          run: async () =>
+            localiseTimestamps(attachReminder(name, args, await handler(args))),
         })) as unknown as Parameters<McpServer["registerTool"]>[2],
     );
   }
